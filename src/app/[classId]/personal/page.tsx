@@ -1,5 +1,8 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { classroom, getStudentById } from "@/lib/mock-data";
 import {
   Card,
   CardContent,
@@ -14,31 +17,74 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { apExamDates } from "@/lib/mock-data";
 
-export default async function PersonalPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ classId: string }>;
-  searchParams: Promise<{ student?: string }>;
-}) {
-  const { classId } = await params;
-  const { student: studentId } = await searchParams;
-  const { students } = classroom;
+interface SubjectInfo {
+  subjectCode: string;
+  targetScore: number;
+  fiveRate: number;
+  confidenceLevel: string;
+}
 
-  const currentStudent = studentId
-    ? getStudentById(studentId) ?? students[0]
-    : students[0];
+interface StudentData {
+  id: string;
+  name: string;
+  classId: string;
+  avgFiveRate: number;
+  avgMcq: number;
+  mcqTestCount: number;
+  avgFrq: number;
+  frqTestCount: number;
+  avgTimed: number;
+  avgUntimed: number;
+  subjects: SubjectInfo[];
+  examDates: { subjectCode: string; date: string }[];
+}
 
-  // --- Compute student stats ---
+interface StudentListItem {
+  id: string;
+  name: string;
+}
 
-  // Overall five rate
-  const fiveRates = currentStudent.subjects.map((s) => s.predictedFiveRate);
-  const avgFiveRate =
-    Math.round(
-      (fiveRates.reduce((a, b) => a + b, 0) / fiveRates.length) * 100
-    );
+export default function PersonalPage() {
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const classId = params.classId as string;
+  const studentId = searchParams.get("student");
+
+  const [studentData, setStudentData] = useState<StudentData | null>(null);
+  const [students, setStudents] = useState<StudentListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch student list
+  useEffect(() => {
+    fetch(`/api/students?classId=${classId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        setStudents(data);
+      });
+  }, [classId]);
+
+  // Fetch student data
+  useEffect(() => {
+    const sid = studentId || students[0]?.id;
+    if (!sid) return;
+
+    fetch(`/api/student/${sid}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setStudentData(d);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [studentId, students, classId]);
+
+  if (loading || !studentData) {
+    return <div className="text-zinc-500">加载中...</div>;
+  }
+
+  const currentStudent = studentData;
+  const avgFiveRate = currentStudent.avgFiveRate;
   const confidenceLevel =
     avgFiveRate >= 75 ? "高" : avgFiveRate >= 55 ? "中" : "低";
   const confidenceColor =
@@ -48,61 +94,8 @@ export default async function PersonalPage({
       ? "bg-yellow-100 text-yellow-800"
       : "bg-red-100 text-red-800";
 
-  // FRQ stats
-  const allFrqScores = currentStudent.subjects.flatMap((s) =>
-    s.mockScores.map((ms) => ms.frqScore)
-  );
-  const avgFrq = allFrqScores.length
-    ? Math.round(
-        allFrqScores.reduce((a, b) => a + b, 0) / allFrqScores.length
-      )
-    : 0;
-  const frqTestCount = allFrqScores.length;
-
-  // MCQ stats
-  const allMcqScores = currentStudent.subjects.flatMap((s) =>
-    s.mockScores.map((ms) => ms.mcqScore)
-  );
-  const avgMcq = allMcqScores.length
-    ? Math.round(
-        allMcqScores.reduce((a, b) => a + b, 0) / allMcqScores.length
-      )
-    : 0;
-  const mcqTestCount = allMcqScores.length;
-
-  // Timed vs untimed
-  const timedScores = currentStudent.subjects.flatMap((s) =>
-    s.mockScores.filter((ms) => ms.timed).map((ms) => ms.overallScore)
-  );
-  const untimedScores = currentStudent.subjects.flatMap((s) =>
-    s.mockScores.filter((ms) => !ms.timed).map((ms) => ms.overallScore)
-  );
-  const avgTimed = timedScores.length
-    ? Math.round(
-        timedScores.reduce((a, b) => a + b, 0) / timedScores.length
-      )
-    : 0;
-  const avgUntimed = untimedScores.length
-    ? Math.round(
-        untimedScores.reduce((a, b) => a + b, 0) / untimedScores.length
-      )
-    : 0;
-
-  // Average mastery per subject
-  function getAvgMastery(subjectIndex: number): number {
-    const masteries = currentStudent.subjects[subjectIndex].topicMastery;
-    if (!masteries.length) return 0;
-    return Math.round(
-      (masteries.reduce((a, b) => a + b.mastery, 0) / masteries.length) * 100
-    );
-  }
-
-  // Get exam date for subject
-  function getExamDate(subject: string): string {
-    const found = apExamDates.find(
-      (e) => e.subject === subject
-    );
-    return found ? found.date : "";
+  function handleStudentChange(sid: string | null) {
+    if (sid) router.push(`/${classId}/personal?student=${sid}`);
   }
 
   return (
@@ -114,19 +107,14 @@ export default async function PersonalPage({
           <p className="text-zinc-500 mt-1">{currentStudent.name}</p>
         </div>
         <div className="w-48">
-          <Select defaultValue={currentStudent.id}>
+          <Select defaultValue={currentStudent.id} onValueChange={handleStudentChange}>
             <SelectTrigger>
               <SelectValue placeholder="选择学生" />
             </SelectTrigger>
             <SelectContent>
               {students.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
-                  <Link
-                    href={`/${classId}/personal?student=${s.id}`}
-                    className="block w-full"
-                  >
-                    {s.name}
-                  </Link>
+                  {s.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -164,10 +152,10 @@ export default async function PersonalPage({
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold text-purple-700">
-              {avgFrq}%
+              {currentStudent.avgFrq}%
             </div>
             <p className="text-sm text-zinc-500 mt-1">
-              平均分 · 共 {frqTestCount} 次测试
+              平均分 · 共 {currentStudent.frqTestCount} 次测试
             </p>
           </CardContent>
         </Card>
@@ -181,10 +169,10 @@ export default async function PersonalPage({
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold text-orange-700">
-              {avgMcq}%
+              {currentStudent.avgMcq}%
             </div>
             <p className="text-sm text-zinc-500 mt-1">
-              平均分 · 共 {mcqTestCount} 次测试
+              平均分 · 共 {currentStudent.mcqTestCount} 次测试
             </p>
           </CardContent>
         </Card>
@@ -201,20 +189,22 @@ export default async function PersonalPage({
               <div>
                 <p className="text-xs text-zinc-400">不计时</p>
                 <p className="text-3xl font-bold text-blue-700">
-                  {avgUntimed}%
+                  {currentStudent.avgUntimed}%
                 </p>
               </div>
               <div className="text-2xl text-zinc-300">vs</div>
               <div>
                 <p className="text-xs text-zinc-400">计时</p>
-                <p className="text-3xl font-bold text-blue-700">{avgTimed}%</p>
+                <p className="text-3xl font-bold text-blue-700">
+                  {currentStudent.avgTimed}%
+                </p>
               </div>
             </div>
             <p className="text-sm text-zinc-500 mt-1">
-              {avgTimed > avgUntimed
-                ? `计时高出 ${avgTimed - avgUntimed}%`
-                : avgTimed < avgUntimed
-                ? `不计时高出 ${avgUntimed - avgTimed}%`
+              {currentStudent.avgTimed > currentStudent.avgUntimed
+                ? `计时高出 ${currentStudent.avgTimed - currentStudent.avgUntimed}%`
+                : currentStudent.avgTimed < currentStudent.avgUntimed
+                ? `不计时高出 ${currentStudent.avgUntimed - currentStudent.avgTimed}%`
                 : "持平"}
             </p>
           </CardContent>
@@ -226,39 +216,38 @@ export default async function PersonalPage({
         <h2 className="text-xl font-bold text-zinc-900 mb-4">报名科目</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {currentStudent.subjects.map((sub) => {
-            const mastery = getAvgMastery(
-              currentStudent.subjects.indexOf(sub)
+            const examDateObj = currentStudent.examDates.find(
+              (e) => e.subjectCode === sub.subjectCode
             );
-            const examDate = getExamDate(sub.subject);
             return (
               <Link
-                key={sub.subject}
-                href={`/${classId}/personal/${encodeURIComponent(sub.subject)}?student=${currentStudent.id}`}
+                key={sub.subjectCode}
+                href={`/${classId}/personal/${encodeURIComponent(sub.subjectCode)}?student=${currentStudent.id}`}
               >
                 <Card className="hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer h-full">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base font-semibold text-zinc-800">
-                      {sub.subject}
+                      {sub.subjectCode}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-zinc-500">5 分率</span>
                       <span className="font-bold text-green-700">
-                        {Math.round(sub.predictedFiveRate * 100)}%
+                        {sub.fiveRate}%
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-zinc-500">掌握度</span>
+                      <span className="text-sm text-zinc-500">置信等级</span>
                       <span className="font-bold text-blue-700">
-                        {mastery}%
+                        {sub.confidenceLevel}
                       </span>
                     </div>
-                    {examDate && (
+                    {examDateObj && (
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-zinc-500">考试日期</span>
                         <span className="text-sm text-zinc-600">
-                          {examDate}
+                          {examDateObj.date}
                         </span>
                       </div>
                     )}

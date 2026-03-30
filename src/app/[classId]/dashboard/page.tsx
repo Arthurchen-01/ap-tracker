@@ -1,5 +1,8 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import { classroom } from "@/lib/mock-data";
 import {
   Card,
   CardContent,
@@ -8,63 +11,47 @@ import {
 } from "@/components/ui/card";
 import { ExamCalendar } from "@/components/exam-calendar";
 
-export default async function DashboardPage({
-  params,
-}: {
-  params: Promise<{ classId: string }>;
-}) {
-  const { classId } = await params;
-  const { students } = classroom;
+interface DashboardData {
+  totalSubjects: number;
+  studentCount: number;
+  avgPerStudent: string;
+  avgFiveRate: number;
+  avgMcq: number;
+  avgFrq: number;
+}
 
-  // --- Compute metrics ---
+export default function DashboardPage() {
+  const params = useParams();
+  const classId = params.classId as string;
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // 1. Total AP subject registrations
-  const totalSubjects = students.reduce(
-    (sum, s) => sum + s.subjects.length,
-    0
-  );
-  const avgPerStudent = (totalSubjects / students.length).toFixed(1);
+  useEffect(() => {
+    fetch(`/api/dashboard?classId=${classId}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setData(d);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [classId]);
 
-  // 2. Average five-rate across all student-subjects
-  let fiveRateSum = 0;
-  let fiveRateCount = 0;
-  for (const s of students) {
-    for (const sub of s.subjects) {
-      fiveRateSum += sub.predictedFiveRate;
-      fiveRateCount++;
-    }
+  if (loading || !data) {
+    return <div className="text-zinc-500">加载中...</div>;
   }
-  const avgFiveRate = Math.round((fiveRateSum / fiveRateCount) * 100);
-
-  // 3 & 4. Average MCQ / FRQ from latest mock scores
-  let mcqSum = 0;
-  let frqSum = 0;
-  let scoreCount = 0;
-  for (const s of students) {
-    for (const sub of s.subjects) {
-      if (sub.mockScores.length > 0) {
-        const latest = sub.mockScores[sub.mockScores.length - 1];
-        mcqSum += latest.mcqScore;
-        frqSum += latest.frqScore;
-        scoreCount++;
-      }
-    }
-  }
-  const avgMcq = Math.round(mcqSum / scoreCount);
-  const avgFrq = Math.round(frqSum / scoreCount);
 
   const cards = [
     {
       title: "全班 AP 报考总科次数",
-      value: `${totalSubjects}科`,
-      sub: `共${students.length}人，人均${avgPerStudent}科`,
+      value: `${data.totalSubjects}科`,
+      sub: `共${data.studentCount}人，人均${data.avgPerStudent}科`,
       metric: "subjects",
       color: "border-l-blue-500 bg-blue-50/50 hover:bg-blue-50",
       valueColor: "text-blue-700",
     },
     {
       title: "班级整体 5 分概率",
-      value: `${avgFiveRate}%`,
+      value: `${data.avgFiveRate}%`,
       sub: "按人×科平均",
       metric: "five-rate",
       color: "border-l-green-500 bg-green-50/50 hover:bg-green-50",
@@ -72,7 +59,7 @@ export default async function DashboardPage({
     },
     {
       title: "班级平均 MCQ 得分率",
-      value: `${avgMcq}%`,
+      value: `${data.avgMcq}%`,
       sub: "最近一次模考",
       metric: "mcq",
       color: "border-l-orange-500 bg-orange-50/50 hover:bg-orange-50",
@@ -80,7 +67,7 @@ export default async function DashboardPage({
     },
     {
       title: "班级平均 FRQ 得分率",
-      value: `${avgFrq}%`,
+      value: `${data.avgFrq}%`,
       sub: "最近一次模考",
       metric: "frq",
       color: "border-l-purple-500 bg-purple-50/50 hover:bg-purple-50",
@@ -92,7 +79,7 @@ export default async function DashboardPage({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-zinc-900">班级仪表盘</h1>
-        <p className="text-zinc-500 mt-1">{classroom.name}</p>
+        <p className="text-zinc-500 mt-1">AP备考班2026</p>
       </div>
 
       {/* Metric cards */}
