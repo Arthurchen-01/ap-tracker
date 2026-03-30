@@ -20,10 +20,37 @@ interface DashboardData {
   avgFrq: number;
 }
 
+interface RiskStudent {
+  studentId: string;
+  name: string;
+  worstSubject: string;
+  fiveRate: number;
+}
+
+interface InactiveStudent {
+  studentId: string;
+  name: string;
+  daysInactive: number;
+}
+
+interface VolatileStudent {
+  studentId: string;
+  name: string;
+  subjectCode: string;
+  stdDev: number;
+}
+
+interface AlertsData {
+  riskStudents: RiskStudent[];
+  inactiveStudents: InactiveStudent[];
+  volatileStudents: VolatileStudent[];
+}
+
 export default function DashboardPage() {
   const params = useParams();
   const classId = params.classId as string;
   const [data, setData] = useState<DashboardData | null>(null);
+  const [alerts, setAlerts] = useState<AlertsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,6 +61,11 @@ export default function DashboardPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+
+    fetch(`/api/dashboard/alerts?classId=${classId}`)
+      .then((r) => r.json())
+      .then((a) => setAlerts(a))
+      .catch(() => {});
   }, [classId]);
 
   if (loading || !data) {
@@ -110,6 +142,91 @@ export default function DashboardPage() {
             </Card>
           </Link>
         ))}
+      </div>
+
+      {/* Alerts */}
+      <div>
+        <h2 className="text-lg font-semibold text-zinc-800 mb-3">预警中心</h2>
+        {alerts && alerts.riskStudents.length === 0 && alerts.inactiveStudents.length === 0 && alerts.volatileStudents.length === 0 ? (
+          <Card className="bg-green-50 border-green-200">
+            <CardContent className="py-6 text-center text-green-700">
+              暂无预警 ✅ 全班状态良好！
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Risk students */}
+            <Card className={alerts && alerts.riskStudents.length > 0 ? "border-l-4 border-l-red-500" : ""}>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">
+                  🔴 风险学生
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {alerts && alerts.riskStudents.length > 0 ? (
+                  <ul className="space-y-2">
+                    {alerts.riskStudents.map((s) => (
+                      <li key={s.studentId} className="text-sm">
+                        <span className="font-medium text-zinc-800">{s.name}</span>
+                        <span className="text-zinc-500"> · {s.worstSubject} {s.fiveRate}%</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-zinc-400">无</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Inactive students */}
+            <Card className={alerts && alerts.inactiveStudents.length > 0 ? "border-l-4 border-l-amber-500" : ""}>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">
+                  ⚠️ 断更学生
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {alerts && alerts.inactiveStudents.length > 0 ? (
+                  <ul className="space-y-2">
+                    {alerts.inactiveStudents.map((s) => (
+                      <li key={s.studentId} className="text-sm">
+                        <span className="font-medium text-zinc-800">{s.name}</span>
+                        <span className="text-zinc-500">
+                          {" "}· 断更 {s.daysInactive >= 999 ? "≥7天" : `${s.daysInactive} 天`}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-zinc-400">无</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Volatile students */}
+            <Card className={alerts && alerts.volatileStudents.length > 0 ? "border-l-4 border-l-purple-500" : ""}>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">
+                  📊 波动异常
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {alerts && alerts.volatileStudents.length > 0 ? (
+                  <ul className="space-y-2">
+                    {alerts.volatileStudents.map((s, i) => (
+                      <li key={`${s.studentId}-${s.subjectCode}-${i}`} className="text-sm">
+                        <span className="font-medium text-zinc-800">{s.name}</span>
+                        <span className="text-zinc-500"> · {s.subjectCode} 标准差 {s.stdDev}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-zinc-400">无</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
 
       {/* Exam calendar */}

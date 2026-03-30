@@ -49,6 +49,24 @@ interface SubjectDetailData {
   frqScores: ScoreEntry[];
   barData: { name: string; 不计时: number; 计时: number }[];
   trendData: { date: string; fiveRate: number }[];
+  components?: {
+    testPerformance: number;
+    trend: number;
+    stability: number;
+    reviewQuality: number;
+    decay: number;
+  };
+}
+
+interface SnapshotEntry {
+  id: string;
+  snapshotDate: string;
+  fiveRate: number;
+  stabilityScore: number | null;
+  trendScore: number | null;
+  decayScore: number | null;
+  confidenceLevel: string;
+  explanation: string | null;
 }
 
 export default function SubjectDetailPage({
@@ -64,6 +82,7 @@ export default function SubjectDetailPage({
   const decodedSubject = decodeURIComponent(subjectId);
 
   const [data, setData] = useState<SubjectDetailData | null>(null);
+  const [snapshots, setSnapshots] = useState<SnapshotEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -76,6 +95,14 @@ export default function SubjectDetailPage({
         setLoading(false);
       })
       .catch(() => setLoading(false));
+
+    // Fetch real snapshot history for trend chart
+    fetch(`/api/scoring/history?studentId=${studentId}&subjectCode=${decodedSubject}`)
+      .then((r) => r.json())
+      .then((s) => {
+        if (Array.isArray(s)) setSnapshots(s);
+      })
+      .catch(() => {});
   }, [studentId, decodedSubject]);
 
   if (loading || !data) {
@@ -92,8 +119,13 @@ export default function SubjectDetailPage({
       ? "bg-yellow-100 text-yellow-800"
       : "bg-red-100 text-red-800";
 
-  // Line chart data: use trendData from API, fallback to mcq-based estimate
-  const trendChartData = data.trendData.length > 0
+  // Line chart data: prefer real snapshot history, fallback to trendData from API
+  const trendChartData = snapshots.length > 0
+    ? snapshots.map((s) => ({
+        date: new Date(s.snapshotDate).toLocaleDateString("zh-CN", { month: "short", day: "numeric" }),
+        五分率: Math.round(s.fiveRate * 100),
+      }))
+    : data.trendData.length > 0
     ? data.trendData.map((t) => ({ date: t.date, 五分率: t.fiveRate }))
     : data.mcqScores.map((ms) => ({
         date: ms.date,
@@ -287,6 +319,76 @@ export default function SubjectDetailPage({
                 ))}
               </TableBody>
             </Table>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Explanation & Suggestions */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Latest explanation */}
+        {snapshots.length > 0 && snapshots[snapshots.length - 1].explanation && (
+          <Card className="border-l-4 border-l-blue-500">
+            <CardHeader>
+              <CardTitle className="text-base">📝 最近变化解释</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-zinc-700 leading-relaxed">
+                {snapshots[snapshots.length - 1].explanation}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Suggestions */}
+        <Card className="border-l-4 border-l-amber-500">
+          <CardHeader>
+            <CardTitle className="text-base">💡 下一步建议</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2 text-sm text-zinc-700">
+              {data.components && data.components.testPerformance < 0.5 && (
+                <li className="flex items-start gap-2">
+                  <span>📌</span>
+                  <span>MCQ/FRQ 基础分偏低，建议加强计时练习以提高答题速度和准确率</span>
+                </li>
+              )}
+              {data.components && data.components.reviewQuality < 0.3 && (
+                <li className="flex items-start gap-2">
+                  <span>📌</span>
+                  <span>复习质量有待提高，建议做详细笔记并整理错题</span>
+                </li>
+              )}
+              {data.components && data.components.decay > 0.03 && (
+                <li className="flex items-start gap-2">
+                  <span>⚠️</span>
+                  <span>距上次学习已有一段时间，遗忘衰减明显，建议尽快做一次测试</span>
+                </li>
+              )}
+              {data.components && data.components.stability < 0.5 && (
+                <li className="flex items-start gap-2">
+                  <span>📊</span>
+                  <span>成绩波动较大，建议在弱项知识点重点突破</span>
+                </li>
+              )}
+              {data.components && data.components.trend > 0.7 && (
+                <li className="flex items-start gap-2">
+                  <span>✅</span>
+                  <span>近期趋势向好，继续保持当前学习节奏</span>
+                </li>
+              )}
+              {fiveRate >= 75 && (
+                <li className="flex items-start gap-2">
+                  <span>🎯</span>
+                  <span>5 分概率较高，保持稳定复习频率即可</span>
+                </li>
+              )}
+              {!data.components && (
+                <li className="flex items-start gap-2">
+                  <span>📌</span>
+                  <span>建议定期做计时模考以积累评估数据</span>
+                </li>
+              )}
+            </ul>
           </CardContent>
         </Card>
       </div>

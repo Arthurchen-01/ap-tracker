@@ -47,6 +47,14 @@ interface DailyUpdateRecord {
   description: string | null;
 }
 
+interface RateChangeResult {
+  success: boolean;
+  oldRate: number;
+  newRate: number;
+  change: number;
+  explanation: string;
+}
+
 export default function DailyUpdatePage() {
   const today = new Date().toISOString().slice(0, 10);
 
@@ -64,6 +72,7 @@ export default function DailyUpdatePage() {
   const [records, setRecords] = useState<DailyUpdateRecord[]>([]);
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [rateChange, setRateChange] = useState<RateChangeResult | null>(null);
 
   function updateField(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -106,8 +115,10 @@ export default function DailyUpdatePage() {
       });
 
       if (res.ok) {
+        const result = await res.json();
         setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
+        setRateChange(result);
+        setTimeout(() => setSuccess(false), 5000);
         loadRecords();
         // Reset form but keep date
         setForm({
@@ -134,6 +145,43 @@ export default function DailyUpdatePage() {
         <div className="mb-4 rounded-md bg-green-50 p-3 text-sm text-green-800 border border-green-200">
           ✅ 记录已成功保存！
         </div>
+      )}
+
+      {rateChange && (
+        <Card className="mb-4 border-l-4 border-l-blue-500">
+          <CardHeader>
+            <CardTitle className="text-base">📊 5 分率变化</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-4">
+              <div className="text-center">
+                <div className="text-sm text-zinc-500">旧值</div>
+                <div className="text-2xl font-bold text-zinc-600">{rateChange.oldRate}%</div>
+              </div>
+              <div className="text-2xl">
+                {rateChange.change > 0 ? "→" : rateChange.change < 0 ? "→" : "→"}
+              </div>
+              <div className="text-center">
+                <div className="text-sm text-zinc-500">新值</div>
+                <div className={`text-2xl font-bold ${rateChange.newRate >= rateChange.oldRate ? "text-green-700" : "text-red-700"}`}>
+                  {rateChange.newRate}%
+                </div>
+              </div>
+              <div className={`text-lg font-semibold px-3 py-1 rounded-full ${
+                rateChange.change > 0
+                  ? "bg-green-100 text-green-700"
+                  : rateChange.change < 0
+                  ? "bg-red-100 text-red-700"
+                  : "bg-zinc-100 text-zinc-600"
+              }`}>
+                {rateChange.change > 0 ? `↑ +${rateChange.change}%` : rateChange.change < 0 ? `↓ ${rateChange.change}%` : "→ 0%"}
+              </div>
+            </div>
+            <p className="text-sm text-zinc-600 leading-relaxed">
+              {rateChange.explanation}
+            </p>
+          </CardContent>
+        </Card>
       )}
 
       <form onSubmit={handleSubmit}>
