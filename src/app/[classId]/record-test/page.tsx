@@ -4,23 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
-// ---------- Constants ----------
-
-const TASK_TYPES = [
-  "MCQ练习",
-  "FRQ练习",
-  "整套模考",
-  "知识点复习",
-  "错题整理",
-  "看资料/视频",
-  "其他",
-] as const;
-
-const ANSWER_CONDITIONS = ["计时", "不计时", "不适用"] as const;
 
 const SUBJECTS = [
   { code: "AP-Macro", name: "AP 宏观经济学" },
@@ -35,33 +20,43 @@ const SUBJECTS = [
   { code: "AP-Chem", name: "AP 化学" },
 ];
 
-interface DailyUpdateRecord {
+const RECORD_TYPES = [
+  { value: "MCQ", label: "MCQ（选择题）" },
+  { value: "FRQ", label: "FRQ（简答题）" },
+  { value: "FullMock", label: "完整模考" },
+] as const;
+
+const TIMED_MODES = [
+  { value: "timed", label: "计时" },
+  { value: "untimed", label: "不计时" },
+] as const;
+
+interface AssessmentRecord {
   id: string;
-  updateDate: string;
   subjectCode: string;
-  activityType: string;
-  timedMode: string | null;
-  durationMinutes: number | null;
+  recordType: string;
+  timedMode: string;
+  difficulty: string;
   scoreRaw: number | null;
   scorePercent: number | null;
-  description: string | null;
+  takenAt: string;
 }
 
-export default function DailyUpdatePage() {
+export default function RecordTestPage() {
   const today = new Date().toISOString().slice(0, 10);
 
   const [form, setForm] = useState({
-    date: today,
     subjectCode: "",
-    activityType: "",
-    timedMode: "",
-    durationMinutes: "",
+    recordType: "",
+    timedMode: "timed",
+    difficulty: "medium",
+    source: "",
     scoreRaw: "",
     scorePercent: "",
-    description: "",
+    takenAt: today,
   });
 
-  const [records, setRecords] = useState<DailyUpdateRecord[]>([]);
+  const [records, setRecords] = useState<AssessmentRecord[]>([]);
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -70,7 +65,7 @@ export default function DailyUpdatePage() {
   }
 
   const loadRecords = useCallback(() => {
-    fetch("/api/daily-update")
+    fetch("/api/assessment")
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setRecords(data);
@@ -83,25 +78,25 @@ export default function DailyUpdatePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.subjectCode || !form.activityType) {
+    if (!form.subjectCode || !form.recordType) {
       alert("请填写所有必填项（带 * 号）");
       return;
     }
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/daily-update", {
+      const res = await fetch("/api/assessment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          updateDate: form.date,
           subjectCode: form.subjectCode,
-          activityType: form.activityType,
-          timedMode: form.timedMode || null,
-          durationMinutes: form.durationMinutes || null,
+          recordType: form.recordType,
+          timedMode: form.timedMode,
+          difficulty: form.difficulty,
+          source: form.source || null,
           scoreRaw: form.scoreRaw || null,
           scorePercent: form.scorePercent || null,
-          description: form.description || null,
+          takenAt: form.takenAt,
         }),
       });
 
@@ -109,16 +104,15 @@ export default function DailyUpdatePage() {
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
         loadRecords();
-        // Reset form but keep date
         setForm({
-          date: today,
           subjectCode: "",
-          activityType: "",
-          timedMode: "",
-          durationMinutes: "",
+          recordType: "",
+          timedMode: "timed",
+          difficulty: "medium",
+          source: "",
           scoreRaw: "",
           scorePercent: "",
-          description: "",
+          takenAt: today,
         });
       }
     } finally {
@@ -128,28 +122,28 @@ export default function DailyUpdatePage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="mb-6 text-2xl font-bold text-zinc-900">每日更新</h1>
+      <h1 className="mb-6 text-2xl font-bold text-zinc-900">记录测试成绩</h1>
 
       {success && (
         <div className="mb-4 rounded-md bg-green-50 p-3 text-sm text-green-800 border border-green-200">
-          ✅ 记录已成功保存！
+          ✅ 测试记录已成功保存！
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
         <Card>
           <CardHeader>
-            <CardTitle>填写今日学习记录</CardTitle>
+            <CardTitle>录入测试成绩</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
             {/* Date */}
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="date">日期</Label>
+              <Label htmlFor="takenAt">考试日期</Label>
               <Input
-                id="date"
+                id="takenAt"
                 type="date"
-                value={form.date}
-                onChange={(e) => updateField("date", e.target.value)}
+                value={form.takenAt}
+                onChange={(e) => updateField("takenAt", e.target.value)}
               />
             </div>
 
@@ -173,27 +167,27 @@ export default function DailyUpdatePage() {
               </select>
             </div>
 
-            {/* Task Type */}
+            {/* Record Type */}
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="activityType">
-                任务类型 <span className="text-red-500">*</span>
+              <Label htmlFor="recordType">
+                测试类型 <span className="text-red-500">*</span>
               </Label>
               <select
-                id="activityType"
-                value={form.activityType}
-                onChange={(e) => updateField("activityType", e.target.value)}
+                id="recordType"
+                value={form.recordType}
+                onChange={(e) => updateField("recordType", e.target.value)}
                 className="flex h-9 w-full rounded-md border border-zinc-200 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950"
               >
-                <option value="">请选择任务类型</option>
-                {TASK_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+                <option value="">请选择测试类型</option>
+                {RECORD_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Answer Condition */}
+            {/* Timed Mode */}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="timedMode">作答条件</Label>
               <select
@@ -202,13 +196,38 @@ export default function DailyUpdatePage() {
                 onChange={(e) => updateField("timedMode", e.target.value)}
                 className="flex h-9 w-full rounded-md border border-zinc-200 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950"
               >
-                <option value="">请选择</option>
-                {ANSWER_CONDITIONS.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+                {TIMED_MODES.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Difficulty */}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="difficulty">难度</Label>
+              <select
+                id="difficulty"
+                value={form.difficulty}
+                onChange={(e) => updateField("difficulty", e.target.value)}
+                className="flex h-9 w-full rounded-md border border-zinc-200 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950"
+              >
+                <option value="easy">简单</option>
+                <option value="medium">中等</option>
+                <option value="hard">困难</option>
+              </select>
+            </div>
+
+            {/* Source */}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="source">来源</Label>
+              <Input
+                id="source"
+                placeholder="如：Barron's, Princeton Review"
+                value={form.source}
+                onChange={(e) => updateField("source", e.target.value)}
+              />
             </div>
 
             {/* Score fields */}
@@ -219,7 +238,7 @@ export default function DailyUpdatePage() {
                   id="scoreRaw"
                   type="number"
                   min={0}
-                  placeholder="如 85"
+                  placeholder="如 42"
                   value={form.scoreRaw}
                   onChange={(e) => updateField("scoreRaw", e.target.value)}
                 />
@@ -231,41 +250,16 @@ export default function DailyUpdatePage() {
                   type="number"
                   min={0}
                   max={100}
-                  placeholder="如 80"
+                  placeholder="如 84"
                   value={form.scorePercent}
                   onChange={(e) => updateField("scorePercent", e.target.value)}
                 />
               </div>
             </div>
 
-            {/* Duration */}
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="durationMinutes">花费时间（分钟）</Label>
-              <Input
-                id="durationMinutes"
-                type="number"
-                min={0}
-                placeholder="如 60"
-                value={form.durationMinutes}
-                onChange={(e) => updateField("durationMinutes", e.target.value)}
-              />
-            </div>
-
-            {/* Description */}
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="description">描述</Label>
-              <Textarea
-                id="description"
-                placeholder="详细描述今天的学习内容，例如：复习了 Macro Unit 3，做了 20 道 MCQ，错了 4 道，整理了错因…"
-                rows={4}
-                value={form.description}
-                onChange={(e) => updateField("description", e.target.value)}
-              />
-            </div>
-
             {/* Submit */}
             <Button type="submit" className="mt-2 w-full" disabled={submitting}>
-              {submitting ? "提交中..." : "提交记录"}
+              {submitting ? "提交中..." : "提交测试记录"}
             </Button>
           </CardContent>
         </Card>
@@ -275,7 +269,7 @@ export default function DailyUpdatePage() {
       {records.length > 0 && (
         <Card className="mt-8">
           <CardHeader>
-            <CardTitle>历史更新记录</CardTitle>
+            <CardTitle>历史测试记录</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
@@ -283,8 +277,9 @@ export default function DailyUpdatePage() {
                 <TableRow>
                   <TableHead>日期</TableHead>
                   <TableHead>科目</TableHead>
-                  <TableHead>任务类型</TableHead>
-                  <TableHead>用时</TableHead>
+                  <TableHead>类型</TableHead>
+                  <TableHead>条件</TableHead>
+                  <TableHead>难度</TableHead>
                   <TableHead>得分</TableHead>
                   <TableHead>正确率</TableHead>
                 </TableRow>
@@ -293,12 +288,13 @@ export default function DailyUpdatePage() {
                 {records.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell>
-                      {new Date(r.updateDate).toLocaleDateString("zh-CN")}
+                      {new Date(r.takenAt).toLocaleDateString("zh-CN")}
                     </TableCell>
                     <TableCell>{r.subjectCode}</TableCell>
-                    <TableCell>{r.activityType}</TableCell>
+                    <TableCell>{r.recordType}</TableCell>
+                    <TableCell>{r.timedMode === "timed" ? "计时" : "不计时"}</TableCell>
                     <TableCell>
-                      {r.durationMinutes ? `${r.durationMinutes} 分钟` : "-"}
+                      {r.difficulty === "easy" ? "简单" : r.difficulty === "hard" ? "困难" : "中等"}
                     </TableCell>
                     <TableCell>{r.scoreRaw ?? "-"}</TableCell>
                     <TableCell>

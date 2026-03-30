@@ -1,15 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, usePathname } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const navItems = [
   { label: "仪表盘", href: "dashboard" },
   { label: "个人中心", href: "personal" },
   { label: "每日更新", href: "daily-update" },
+  { label: "记录测试", href: "record-test" },
   { label: "资源共享", href: "resources" },
 ];
+
+interface MeData {
+  studentId: string;
+  name: string;
+  classId: string;
+}
 
 export default function ClassLayout({
   children,
@@ -18,7 +27,26 @@ export default function ClassLayout({
 }) {
   const params = useParams();
   const pathname = usePathname();
+  const router = useRouter();
   const classId = params.classId as string;
+  const [user, setUser] = useState<MeData | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data?.studentId) {
+          router.push("/login");
+        } else {
+          setUser(data);
+        }
+      });
+  }, [router]);
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+  }
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -55,6 +83,19 @@ export default function ClassLayout({
                 </Link>
               );
             })}
+          </div>
+
+          <div className="flex items-center gap-3">
+            {user && (
+              <>
+                <span className="text-sm font-medium text-zinc-700">
+                  👤 {user.name}
+                </span>
+                <Button variant="outline" size="xs" onClick={handleLogout}>
+                  登出
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </nav>
