@@ -1,3 +1,5 @@
+import { AI_CONFIG, isAIEnabled } from './ai-config'
+
 export interface ExplanationContext {
   studentName: string
   subjectCode: string
@@ -9,7 +11,16 @@ export interface ExplanationContext {
   timedMode: string | null
   description: string | null
   daysSinceLastUpdate: number
+  components?: {
+    testPerformance: number
+    trend: number
+    stability: number
+    reviewQuality: number
+    decay: number
+  }
 }
+
+// --- Template version ---
 
 function formatChange(change: number): string {
   if (change > 0) return `+${change.toFixed(1)}%`
@@ -36,7 +47,7 @@ function getReviewDetail(ctx: ExplanationContext): string {
   return '记录了简要复习内容'
 }
 
-export function generateExplanation(ctx: ExplanationContext): string {
+function templateExplanation(ctx: ExplanationContext): string {
   const { studentName, subjectCode, change, activityType, daysSinceLastUpdate } = ctx
   const changeStr = formatChange(change)
 
@@ -68,7 +79,6 @@ export function generateExplanation(ctx: ExplanationContext): string {
     detailPart += `。完成了一次${activityType}`
   }
 
-  // Suggestions
   let suggestionPart = ''
   if (change < -1) {
     suggestionPart = '。建议加强薄弱环节的练习，特别是计时模考'
@@ -79,4 +89,67 @@ export function generateExplanation(ctx: ExplanationContext): string {
   }
 
   return `${trendPart}${detailPart}${suggestionPart}`
+}
+
+// --- AI version ---
+
+const EXPLANATION_SYSTEM_PROMPT =
+  '你是AP备考分析助手。根据5分率变化数据，用简洁中文解释变化原因（2-3句话）。语气鼓励但实事求是。'
+
+async function generateExplanationWithAI(ctx: ExplanationContext): Promise<string | null> {
+  if (!isAIEnabled()) return null
+
+  const prompt = JSON.stringify({
+    studentName: ctx.studentName,
+    subjectCode: ctx.subjectCode,
+    oldRate: ctx.oldRate,
+    newRate: ctx.newRate,
+    change: ctx.change,
+    activityType: ctx.activityType,
+    scorePercent: ctx.scorePercent,
+    timedMode: ctx.timedMode,
+    description: ctx.description,
+    daysSinceLastUpdate: ctx.daysSinceLastUpdate,
+    components: ctx.components,
+  })
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 10_000)
+
+  try {
+    const res = await fetch(`${AI_CONFIG.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${AI_CONFIG.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: AI_CONFIG.model,
+        messages: [
+          { role: 'system', content: EXPLANATION_SYSTEM_PROMPT },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.5,
+      }),
+      signal: controller.signal,
+    })
+
+    if (!res.ok) throw new Error(`AI API error: ${res.status}`)
+
+    const data = await res.json()
+    const text = (data.choices[0].message.content as string).trim()
+    return text || null
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+// --- Unified export ---
+
+export async function generateExplanation(ctx: ExplanationContext): Promise<string> {
+  const aiResult = await generateExplanationWithAI(ctx)
+  if (aiResult) return aiResult
+  return templateExplanation(ctx)
 }

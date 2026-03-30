@@ -55,6 +55,8 @@ export default function PersonalPage() {
   const [studentData, setStudentData] = useState<StudentData | null>(null);
   const [students, setStudents] = useState<StudentListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [advice, setAdvice] = useState<string[]>([]);
+  const [adviceLoading, setAdviceLoading] = useState(false);
 
   // Fetch student list
   useEffect(() => {
@@ -77,6 +79,21 @@ export default function PersonalPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+  }, [studentId, students, classId]);
+
+  // Fetch AI advice
+  useEffect(() => {
+    const sid = studentId || students[0]?.id;
+    if (!sid) return;
+
+    setAdviceLoading(true);
+    fetch(`/api/ai/advice?studentId=${sid}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.advice) setAdvice(d.advice);
+        setAdviceLoading(false);
+      })
+      .catch(() => setAdviceLoading(false));
   }, [studentId, students, classId]);
 
   if (loading || !studentData) {
@@ -257,6 +274,31 @@ export default function PersonalPage() {
             );
           })}
         </div>
+      </div>
+
+      {/* AI Learning Advice */}
+      <div>
+        <h2 className="text-xl font-bold text-zinc-900 mb-4">AI 学习建议</h2>
+        <Card className="border-l-4 border-l-cyan-500">
+          <CardContent className="pt-4">
+            {adviceLoading ? (
+              <p className="text-zinc-500">正在生成建议...</p>
+            ) : advice.length > 0 ? (
+              <ul className="space-y-3">
+                {advice.map((item, index) => (
+                  <li key={index} className="flex items-start gap-3">
+                    <Badge variant="outline" className="shrink-0 mt-0.5">
+                      {index + 1}
+                    </Badge>
+                    <span className="text-sm text-zinc-700">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-zinc-500">暂无建议</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

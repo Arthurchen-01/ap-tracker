@@ -64,7 +64,9 @@ function computeStability(scores: number[]): number {
   return Math.max(0, Math.min(1, 1 - stdDev / 50))
 }
 
-async function computeReviewQuality(prisma: PrismaClient, studentId: string, subjectCode: string): Promise<number> {
+async function computeReviewQuality(prisma: PrismaClient, studentId: string, subjectCode: string, aiQualityScore?: number): Promise<number> {
+  if (aiQualityScore != null) return aiQualityScore
+
   const sevenDaysAgo = new Date()
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
@@ -99,6 +101,7 @@ export async function calculateFiveRate(
   prisma: PrismaClient,
   studentId: string,
   subjectCode: string,
+  aiQualityScore?: number,
 ): Promise<ScoringResult> {
   // 1. Fetch assessment records
   const records = await prisma.assessmentRecord.findMany({
@@ -120,7 +123,7 @@ export async function calculateFiveRate(
   const stability = computeStability(recent5)
 
   // 5. Review quality (10%)
-  const reviewQuality = await computeReviewQuality(prisma, studentId, subjectCode)
+  const reviewQuality = await computeReviewQuality(prisma, studentId, subjectCode, aiQualityScore)
 
   // 6. Decay
   const lastRecord = records[records.length - 1]

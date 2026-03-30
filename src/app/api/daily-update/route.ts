@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { calculateFiveRate } from "@/lib/scoring-engine";
 import { generateExplanation } from "@/lib/ai-explainer";
+import { evaluateDailyUpdate } from "@/lib/ai-evaluator";
 
 export async function POST(request: Request) {
   const cookieStore = await cookies();
@@ -38,6 +39,15 @@ export async function POST(request: Request) {
 
   const oldRate = prevSnapshot ? Math.round(prevSnapshot.fiveRate * 100) : 0;
 
+  // AI evaluation of the daily update
+  const aiEval = await evaluateDailyUpdate({
+    description: description || "",
+    subjectCode,
+    activityType,
+    scorePercent: scorePercent != null && scorePercent !== "" ? parseFloat(scorePercent) : null,
+    timedMode: timedMode || null,
+  });
+
   const record = await prisma.dailyUpdate.create({
     data: {
       studentId: sid,
@@ -49,11 +59,14 @@ export async function POST(request: Request) {
       scoreRaw: scoreRaw !== "" && scoreRaw != null ? parseFloat(scoreRaw) : null,
       scorePercent: scorePercent !== "" && scorePercent != null ? parseFloat(scorePercent) : null,
       description: description || null,
+      aiEvidenceLevel: aiEval.evidenceLevel,
+      aiDeltaScore: aiEval.qualityScore,
+      aiExplanation: aiEval.explanation,
     },
   });
 
-  // Auto-recalculate five rate
-  const scoringResult = await calculateFiveRate(prisma, sid, subjectCode);
+  // Auto-recalculate five rate with AI quality score
+  const scoringResult = await calculateFiveRate(prisma, sid, subjectCode, aiEval.qualityScore);
   const newRate = Math.round(scoringResult.fiveRate * 100);
   const change = newRate - oldRate;
 
@@ -67,7 +80,8 @@ export async function POST(request: Request) {
     ? Math.floor((new Date(updateDate).getTime() - prevSnapshot.snapshotDate.getTime()) / (1000 * 60 * 60 * 24))
     : 0
 
-  const explanation = generateExplanation({
+  // Generate explanation (AI-powered with fallback)
+  const explanation = await generateExplanation({
     studentName: student?.name ?? "学生",
     subjectCode,
     oldRate,
@@ -78,6 +92,7 @@ export async function POST(request: Request) {
     timedMode: timedMode || null,
     description: description || null,
     daysSinceLastUpdate,
+    components: scoringResult.components,
   });
 
   // Persist snapshot with explanation
@@ -101,6 +116,7 @@ export async function POST(request: Request) {
     newRate,
     change,
     explanation,
+    aiExplanation: aiEval.explanation,
     record,
   });
 }
