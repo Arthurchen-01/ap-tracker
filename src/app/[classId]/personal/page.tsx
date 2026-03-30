@@ -140,8 +140,8 @@ export default function PersonalPage() {
       </div>
 
       {/* Top 4 metric cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Overall 5-rate */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Overall 5-rate - primary */}
         <Card className="border-l-4 border-l-green-500">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-zinc-600">
@@ -306,6 +306,35 @@ export default function PersonalPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Next Steps */}
+      <Card className="border-l-4 border-l-indigo-500 bg-indigo-50/20">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold text-zinc-800">
+            🎯 今天的行动清单
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-2 text-sm text-zinc-700">
+            {avgFiveRate < 50 && (
+              <li>📌 5 分概率偏低，建议先做一次完整的 MCQ 模考建立基线</li>
+            )}
+            {avgFiveRate >= 50 && avgFiveRate < 75 && (
+              <li>📌 距离高置信还差 {75 - avgFiveRate}%，建议每天做一次计时练习</li>
+            )}
+            {avgFiveRate >= 75 && (
+              <li>✅ 5 分概率已达高置信区间，保持当前节奏即可</li>
+            )}
+            {currentStudent.avgTimed < currentStudent.avgUntimed && (
+              <li>⏱️ 计时分数低于不计时，说明时间管理需要加强，多做限时训练</li>
+            )}
+            {currentStudent.subjects.length > 1 && (
+              <li>📚 多科备考注意分配时间，薄弱科目每天至少投入 30 分钟</li>
+            )}
+            <li>📝 做完练习后记得在「每日更新」记录今天的复习内容</li>
+          </ul>
+        </CardContent>
+      </Card>
     </div>
   );
 }

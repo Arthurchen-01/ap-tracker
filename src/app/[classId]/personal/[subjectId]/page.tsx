@@ -326,6 +326,49 @@ export default function SubjectDetailPage({
         </Card>
       </div>
 
+      {/* Component Breakdown */}
+      {data.components && (
+        <Card className="border-l-4 border-l-teal-500">
+          <CardHeader>
+            <CardTitle className="text-base">🧩 5 分概率拆解</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-zinc-500 mb-4">
+              你的 5 分概率 = <strong>模考表现×0.6</strong> + <strong>趋势×0.15</strong> + <strong>稳定性×0.15</strong> + <strong>复习质量×0.1</strong> − <strong>遗忘衰减</strong>
+            </p>
+            <div className="grid grid-cols-5 gap-3">
+              {[
+                { label: "模考表现", value: data.components.testPerformance, weight: "60%", color: "bg-blue-500" },
+                { label: "趋势", value: data.components.trend, weight: "15%", color: "bg-green-500" },
+                { label: "稳定性", value: data.components.stability, weight: "15%", color: "bg-amber-500" },
+                { label: "复习质量", value: data.components.reviewQuality, weight: "10%", color: "bg-purple-500" },
+                { label: "遗忘衰减", value: data.components.decay, weight: "扣", color: "bg-red-500" },
+              ].map((c) => (
+                <div key={c.label} className="text-center">
+                  <div className="text-xs text-zinc-400 mb-1">{c.label} ({c.weight})</div>
+                  <div className="h-24 bg-zinc-100 rounded-lg relative overflow-hidden flex items-end">
+                    <div
+                      className={`${c.color} w-full rounded-b-lg transition-all`}
+                      style={{ height: `${Math.max(c.value * 100, 5)}%` }}
+                    />
+                  </div>
+                  <div className="text-sm font-semibold text-zinc-800 mt-1">
+                    {c.label === "遗忘衰减"
+                      ? `−${(c.value * 100).toFixed(1)}%`
+                      : `${(c.value * 100).toFixed(0)}%`}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 rounded-lg bg-zinc-100 p-3 text-center">
+              <span className="text-xs font-mono text-zinc-500">
+                = {(data.components.testPerformance * 0.60 * 100).toFixed(1)} + {(data.components.trend * 0.15 * 100).toFixed(1)} + {(data.components.stability * 0.15 * 100).toFixed(1)} + {(data.components.reviewQuality * 0.10 * 100).toFixed(1)} − {(data.components.decay * 100).toFixed(1)} = <strong>{fiveRate}%</strong>
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Explanation & Suggestions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Latest explanation */}

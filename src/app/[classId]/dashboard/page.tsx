@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { ExamCalendar } from "@/components/exam-calendar";
 
 interface DashboardData {
@@ -52,6 +53,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [alerts, setAlerts] = useState<AlertsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showMethodology, setShowMethodology] = useState(false);
 
   useEffect(() => {
     fetch(`/api/dashboard?classId=${classId}`)
@@ -107,12 +109,36 @@ export default function DashboardPage() {
     },
   ];
 
+  // Determine class status from alerts
+  const hasAnyRisk = alerts && (alerts.riskStudents.length > 0 || alerts.inactiveStudents.length > 0 || alerts.volatileStudents.length > 0);
+  const riskCount = alerts ? alerts.riskStudents.length + alerts.inactiveStudents.length + alerts.volatileStudents.length : 0;
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-zinc-900">班级仪表盘</h1>
         <p className="text-zinc-500 mt-1">AP备考班2026</p>
       </div>
+
+      {/* Quick status */}
+      {!loading && (
+        <Card className={hasAnyRisk ? "border-l-4 border-l-amber-500 bg-amber-50/30" : "border-l-4 border-l-green-500 bg-green-50/30"}>
+          <CardContent className="py-3 flex items-center justify-between">
+            <div className="text-sm text-zinc-700">
+              {hasAnyRisk ? (
+                <span>⚠️ 当前有 <strong>{riskCount}</strong> 位同学需要关注，建议查看预警中心</span>
+              ) : (
+                <span>✅ 全班状态良好，继续保持</span>
+              )}
+            </div>
+            {hasAnyRisk && (
+              <a href="#alerts" className="text-sm text-amber-700 font-medium hover:underline">
+                查看预警 ↓
+              </a>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Metric cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -144,8 +170,58 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      {/* 5-rate methodology explainer */}
+      <Card className="border-l-4 border-l-emerald-500 bg-emerald-50/20">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold text-zinc-800">
+              📐 5 分概率是怎么算出来的？
+            </CardTitle>
+            <Badge
+              variant="outline"
+              className="cursor-pointer text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+              onClick={() => setShowMethodology(!showMethodology)}
+            >
+              {showMethodology ? "收起" : "展开说明"}
+            </Badge>
+          </div>
+        </CardHeader>
+        {showMethodology && (
+          <CardContent className="space-y-4">
+            <p className="text-sm text-zinc-600">
+              5 分概率不是拍脑袋的，而是根据你的实际学习数据，用以下 5 个维度加权计算出来的：
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {[
+                { name: "模考表现", weight: "60%", desc: "MCQ / FRQ / 全套模考的加权得分率，计时测试权重更高", color: "bg-blue-50 border-blue-200" },
+                { name: "近期趋势", weight: "15%", desc: "最近 5 次成绩的变化趋势，持续上升则加分", color: "bg-green-50 border-green-200" },
+                { name: "成绩稳定性", weight: "15%", desc: "最近 5 次成绩的波动程度，波动越小越好", color: "bg-amber-50 border-amber-200" },
+                { name: "复习质量", weight: "10%", desc: "7 天内的学习活跃度，有测试记录或详细描述则加分", color: "bg-purple-50 border-purple-200" },
+                { name: "遗忘衰减", weight: "减分项", desc: "距上次学习的天数，太久不动会扣分（每天 -0.5%）", color: "bg-red-50 border-red-200" },
+              ].map((item) => (
+                <div key={item.name} className={`rounded-lg border p-3 ${item.color}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-semibold text-zinc-800">{item.name}</span>
+                    <Badge variant="outline" className="text-xs">{item.weight}</Badge>
+                  </div>
+                  <p className="text-xs text-zinc-600">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-lg bg-zinc-100 p-3">
+              <p className="text-xs text-zinc-500 font-mono">
+                5分率 = 模考表现 × 0.60 + 趋势 × 0.15 + 稳定性 × 0.15 + 复习质量 × 0.10 − 遗忘衰减
+              </p>
+            </div>
+            <p className="text-xs text-zinc-400">
+              💡 模考稳定 ≥75 分，即可判断为高 5 分置信度。点击「查看详情 →」可看到个人的具体维度得分。
+            </p>
+          </CardContent>
+        )}
+      </Card>
+
       {/* Alerts */}
-      <div>
+      <div id="alerts">
         <h2 className="text-lg font-semibold text-zinc-800 mb-3">预警中心</h2>
         {alerts && alerts.riskStudents.length === 0 && alerts.inactiveStudents.length === 0 && alerts.volatileStudents.length === 0 ? (
           <Card className="bg-green-50 border-green-200">
@@ -167,8 +243,10 @@ export default function DashboardPage() {
                   <ul className="space-y-2">
                     {alerts.riskStudents.map((s) => (
                       <li key={s.studentId} className="text-sm">
-                        <span className="font-medium text-zinc-800">{s.name}</span>
-                        <span className="text-zinc-500"> · {s.worstSubject} {s.fiveRate}%</span>
+                        <Link href={`/${classId}/personal?student=${s.studentId}`} className="hover:underline">
+                          <span className="font-medium text-zinc-800">{s.name}</span>
+                          <span className="text-zinc-500"> · {s.worstSubject} {s.fiveRate}%</span>
+                        </Link>
                       </li>
                     ))}
                   </ul>
@@ -190,10 +268,12 @@ export default function DashboardPage() {
                   <ul className="space-y-2">
                     {alerts.inactiveStudents.map((s) => (
                       <li key={s.studentId} className="text-sm">
-                        <span className="font-medium text-zinc-800">{s.name}</span>
-                        <span className="text-zinc-500">
-                          {" "}· 断更 {s.daysInactive >= 999 ? "≥7天" : `${s.daysInactive} 天`}
-                        </span>
+                        <Link href={`/${classId}/personal?student=${s.studentId}`} className="hover:underline">
+                          <span className="font-medium text-zinc-800">{s.name}</span>
+                          <span className="text-zinc-500">
+                            {" "}· 断更 {s.daysInactive >= 999 ? "≥7天" : `${s.daysInactive} 天`}
+                          </span>
+                        </Link>
                       </li>
                     ))}
                   </ul>
@@ -215,8 +295,10 @@ export default function DashboardPage() {
                   <ul className="space-y-2">
                     {alerts.volatileStudents.map((s, i) => (
                       <li key={`${s.studentId}-${s.subjectCode}-${i}`} className="text-sm">
-                        <span className="font-medium text-zinc-800">{s.name}</span>
-                        <span className="text-zinc-500"> · {s.subjectCode} 标准差 {s.stdDev}</span>
+                        <Link href={`/${classId}/personal?student=${s.studentId}`} className="hover:underline">
+                          <span className="font-medium text-zinc-800">{s.name}</span>
+                          <span className="text-zinc-500"> · {s.subjectCode} 标准差 {s.stdDev}</span>
+                        </Link>
                       </li>
                     ))}
                   </ul>
