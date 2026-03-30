@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Class {
+  id          String         @id @default(cuid())
+  name        String
+  season      String
+  students    Student[]
+  examDates   ExamDate[]
+  createdAt   DateTime       @default(now())
+}
+
+model Student {
+  id              String               @id @default(cuid())
+  classId         String
+  name            String
+  role            String               @default("student")
+  class           Class                @relation(fields: [classId], references: [id])
+  subjects        StudentSubject[]
+  assessments     AssessmentRecord[]
+  dailyUpdates    DailyUpdate[]
+  snapshots       ProbabilitySnapshot[]
+  resources       Resource[]
+}
+
+model Subject {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  unitCount     Int
+  passingScore  Float
+}
+
+model StudentSubject {
+  id           String  @id @default(cuid())
+  studentId    String
+  subjectCode  String
+  targetScore  Float   @default(5)
+  student      Student @relation(fields: [studentId], references: [id])
+}
+
+model ExamDate {
+  id          String   @id @default(cuid())
+  classId     String
+  subjectCode String
+  examDate    DateTime
+  class       Class    @relation(fields: [classId], references: [id])
+}
+
+model AssessmentRecord {
+  id           String   @id @default(cuid())
+  studentId    String
+  subjectCode  String
+  recordType   String
+  timedMode    String
+  difficulty   String
+  source       String?
+  scoreRaw     Float?
+  scorePercent Float?
+  takenAt      DateTime
+  student      Student  @relation(fields: [studentId], references: [id])
+}
+
+model DailyUpdate {
+  id              String   @id @default(cuid())
+  studentId       String
+  updateDate      DateTime
+  subjectCode     String
+  activityType    String
+  timedMode       String?
+  durationMinutes Int?
+  scoreRaw        Float?
+  scorePercent    Float?
+  description     String?
+  aiEvidenceLevel String?
+  aiDeltaScore    Float?
+  aiExplanation   String?
+  student         Student  @relation(fields: [studentId], references: [id])
+}
+
+model ProbabilitySnapshot {
+  id              String   @id @default(cuid())
+  studentId       String
+  subjectCode     String
+  snapshotDate    DateTime
+  fiveRate        Float
+  readinessScore  Float?
+  stabilityScore  Float?
+  trendScore      Float?
+  decayScore      Float?
+  confidenceLevel String
+  explanation     String?
+  student         Student  @relation(fields: [studentId], references: [id])
+}
+
+model Resource {
+  id           String   @id @default(cuid())
+  uploaderId   String
+  subjectCode  String
+  title        String
+  resourceType String
+  unit         String?
+  description  String?
+  url          String?
+  createdAt    DateTime @default(now())
+  student      Student  @relation(fields: [uploaderId], references: [id])
+}
