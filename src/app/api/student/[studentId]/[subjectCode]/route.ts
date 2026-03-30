@@ -21,12 +21,14 @@ export async function GET(
     where: { studentId, subjectCode: decodedSubject },
     orderBy: { takenAt: "asc" },
   });
+  type AssessmentRecord = (typeof assessments)[number];
 
   // Get snapshots for trend
   const snapshots = await prisma.probabilitySnapshot.findMany({
     where: { studentId, subjectCode: decodedSubject },
     orderBy: { snapshotDate: "asc" },
   });
+  type SnapshotRecord = (typeof snapshots)[number];
 
   // Latest snapshot
   const latestSnap = snapshots.length > 0 ? snapshots[snapshots.length - 1] : null;
@@ -38,22 +40,38 @@ export async function GET(
   });
 
   // MCQ records
-  const mcqRecords = assessments.filter((a) => a.recordType === "MCQ");
-  const frqRecords = assessments.filter((a) => a.recordType === "FRQ");
+  const mcqRecords = assessments.filter(
+    (a: AssessmentRecord) => a.recordType === "MCQ"
+  );
+  const frqRecords = assessments.filter(
+    (a: AssessmentRecord) => a.recordType === "FRQ"
+  );
 
   // Timed vs untimed comparison
-  const timedMcq = mcqRecords.filter((a) => a.timedMode === "timed" && a.scorePercent != null);
-  const untimedMcq = mcqRecords.filter((a) => a.timedMode !== "timed" && a.scorePercent != null);
-  const timedFrq = frqRecords.filter((a) => a.timedMode === "timed" && a.scorePercent != null);
-  const untimedFrq = frqRecords.filter((a) => a.timedMode !== "timed" && a.scorePercent != null);
+  const timedMcq = mcqRecords.filter(
+    (a: AssessmentRecord) => a.timedMode === "timed" && a.scorePercent != null
+  );
+  const untimedMcq = mcqRecords.filter(
+    (a: AssessmentRecord) => a.timedMode !== "timed" && a.scorePercent != null
+  );
+  const timedFrq = frqRecords.filter(
+    (a: AssessmentRecord) => a.timedMode === "timed" && a.scorePercent != null
+  );
+  const untimedFrq = frqRecords.filter(
+    (a: AssessmentRecord) => a.timedMode !== "timed" && a.scorePercent != null
+  );
 
   const avg = (arr: { scorePercent: number | null }[]) => {
-    const vals = arr.map((r) => r.scorePercent!).filter((v) => v != null);
-    return vals.length > 0 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+    const vals = arr
+      .map((r: { scorePercent: number | null }) => r.scorePercent!)
+      .filter((v: number | null) => v != null);
+    return vals.length > 0
+      ? Math.round(vals.reduce((a: number, b: number) => a + b, 0) / vals.length)
+      : 0;
   };
 
   // Trend data from snapshots
-  const trendData = snapshots.map((s) => ({
+  const trendData = snapshots.map((s: SnapshotRecord) => ({
     date: s.snapshotDate.toISOString().split("T")[0],
     fiveRate: Math.round(s.fiveRate * 100),
   }));
@@ -66,13 +84,13 @@ export async function GET(
     confidenceLevel: latestSnap?.confidenceLevel ?? "未知",
     assessmentCount: assessments.length,
     examDate: examDate ? examDate.examDate.toISOString().split("T")[0] : null,
-    mcqScores: mcqRecords.map((r) => ({
+    mcqScores: mcqRecords.map((r: AssessmentRecord) => ({
       date: r.takenAt.toISOString().split("T")[0],
       label: r.source ?? `测试`,
       score: r.scorePercent,
       timed: r.timedMode === "timed",
     })),
-    frqScores: frqRecords.map((r) => ({
+    frqScores: frqRecords.map((r: AssessmentRecord) => ({
       date: r.takenAt.toISOString().split("T")[0],
       label: r.source ?? `测试`,
       score: r.scorePercent,

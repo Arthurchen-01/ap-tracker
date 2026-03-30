@@ -35,7 +35,9 @@ export async function GET(request: Request) {
   const avgFiveRate =
     fiveRates.length > 0
       ? Math.round(
-          (fiveRates.reduce((a, b) => a + b, 0) / fiveRates.length) * 100
+          (fiveRates.reduce((a: number, b: number) => a + b, 0) /
+            fiveRates.length) *
+            100
         )
       : 0;
 
@@ -47,8 +49,13 @@ export async function GET(request: Request) {
   const avgMcq =
     mcqRecords.length > 0
       ? Math.round(
-          mcqRecords.reduce((sum, r) => sum + (r.scorePercent ?? 0), 0) /
-            mcqRecords.length
+          mcqRecords.reduce(
+            (
+              sum: number,
+              r: (typeof mcqRecords)[number]
+            ) => sum + (r.scorePercent ?? 0),
+            0
+          ) / mcqRecords.length
         )
       : 0;
 
@@ -60,8 +67,13 @@ export async function GET(request: Request) {
   const avgFrq =
     frqRecords.length > 0
       ? Math.round(
-          frqRecords.reduce((sum, r) => sum + (r.scorePercent ?? 0), 0) /
-            frqRecords.length
+          frqRecords.reduce(
+            (
+              sum: number,
+              r: (typeof frqRecords)[number]
+            ) => sum + (r.scorePercent ?? 0),
+            0
+          ) / frqRecords.length
         )
       : 0;
 

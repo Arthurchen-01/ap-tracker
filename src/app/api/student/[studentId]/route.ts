@@ -22,77 +22,121 @@ export async function GET(
   });
 
   if (!student) {
-    return NextResponse.json({ error: "学生不存在" }, { status: 404 });
+    return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }
 
-  // Latest five-rate per subject
-  const latestSnapshots = new Map<string, { fiveRate: number; confidenceLevel: string }>();
-  for (const snap of student.snapshots) {
-    if (!latestSnapshots.has(snap.subjectCode)) {
-      latestSnapshots.set(snap.subjectCode, {
-        fiveRate: snap.fiveRate,
-        confidenceLevel: snap.confidenceLevel,
+  type StudentAssessment = (typeof student.assessments)[number];
+  type StudentSubject = (typeof student.subjects)[number];
+  type StudentSnapshot = (typeof student.snapshots)[number];
+
+  const latestSnapshots = new Map<
+    string,
+    { fiveRate: number; confidenceLevel: string }
+  >();
+
+  for (const snapshot of student.snapshots as StudentSnapshot[]) {
+    if (!latestSnapshots.has(snapshot.subjectCode)) {
+      latestSnapshots.set(snapshot.subjectCode, {
+        fiveRate: snapshot.fiveRate,
+        confidenceLevel: snapshot.confidenceLevel,
       });
     }
   }
 
-  // Overall five rate
-  const fiveRates = Array.from(latestSnapshots.values()).map((s) => s.fiveRate);
+  const fiveRates = Array.from(latestSnapshots.values()).map(
+    (snapshot) => snapshot.fiveRate
+  );
   const avgFiveRate =
     fiveRates.length > 0
-      ? Math.round((fiveRates.reduce((a, b) => a + b, 0) / fiveRates.length) * 100)
+      ? Math.round(
+          (fiveRates.reduce((a: number, b: number) => a + b, 0) /
+            fiveRates.length) *
+            100
+        )
       : 0;
+
   const overallConfidenceLevel = getAggregateConfidenceLevel(
-    Array.from(latestSnapshots.values()).map((s) => s.confidenceLevel),
+    Array.from(latestSnapshots.values()).map(
+      (snapshot) => snapshot.confidenceLevel
+    )
   );
 
-  // MCQ stats
   const mcqRecords = student.assessments.filter(
-    (a) => a.recordType === "MCQ" && a.scorePercent != null
+    (assessment: StudentAssessment) =>
+      assessment.recordType === "MCQ" && assessment.scorePercent != null
   );
-  const mcqScores = mcqRecords.map((r) => r.scorePercent!);
+  const mcqScores = mcqRecords.map(
+    (assessment: StudentAssessment) => assessment.scorePercent as number
+  );
   const avgMcq =
     mcqScores.length > 0
-      ? Math.round(mcqScores.reduce((a, b) => a + b, 0) / mcqScores.length)
+      ? Math.round(
+          mcqScores.reduce((a: number, b: number) => a + b, 0) /
+            mcqScores.length
+        )
       : 0;
 
-  // FRQ stats
   const frqRecords = student.assessments.filter(
-    (a) => a.recordType === "FRQ" && a.scorePercent != null
+    (assessment: StudentAssessment) =>
+      assessment.recordType === "FRQ" && assessment.scorePercent != null
   );
-  const frqScores = frqRecords.map((r) => r.scorePercent!);
+  const frqScores = frqRecords.map(
+    (assessment: StudentAssessment) => assessment.scorePercent as number
+  );
   const avgFrq =
     frqScores.length > 0
-      ? Math.round(frqScores.reduce((a, b) => a + b, 0) / frqScores.length)
+      ? Math.round(
+          frqScores.reduce((a: number, b: number) => a + b, 0) /
+            frqScores.length
+        )
       : 0;
 
-  // Timed vs untimed
-  const timedRecords = student.assessments.filter((a) => a.timedMode === "timed" && a.scorePercent != null);
-  const untimedRecords = student.assessments.filter((a) => a.timedMode !== "timed" && a.scorePercent != null);
+  const timedRecords = student.assessments.filter(
+    (assessment: StudentAssessment) =>
+      assessment.timedMode === "timed" && assessment.scorePercent != null
+  );
+  const untimedRecords = student.assessments.filter(
+    (assessment: StudentAssessment) =>
+      assessment.timedMode !== "timed" && assessment.scorePercent != null
+  );
+
   const avgTimed =
     timedRecords.length > 0
-      ? Math.round(timedRecords.reduce((sum, r) => sum + (r.scorePercent ?? 0), 0) / timedRecords.length)
-      : 0;
-  const avgUntimed =
-    untimedRecords.length > 0
-      ? Math.round(untimedRecords.reduce((sum, r) => sum + (r.scorePercent ?? 0), 0) / untimedRecords.length)
+      ? Math.round(
+          timedRecords.reduce(
+            (sum: number, assessment: StudentAssessment) =>
+              sum + (assessment.scorePercent ?? 0),
+            0
+          ) / timedRecords.length
+        )
       : 0;
 
-  // Subject details
-  const subjects = student.subjects.map((sub) => {
-    const snap = latestSnapshots.get(sub.subjectCode);
+  const avgUntimed =
+    untimedRecords.length > 0
+      ? Math.round(
+          untimedRecords.reduce(
+            (sum: number, assessment: StudentAssessment) =>
+              sum + (assessment.scorePercent ?? 0),
+            0
+          ) / untimedRecords.length
+        )
+      : 0;
+
+  const subjects = student.subjects.map((subject: StudentSubject) => {
+    const snapshot = latestSnapshots.get(subject.subjectCode);
+
     return {
-      subjectCode: sub.subjectCode,
-      targetScore: sub.targetScore,
-      fiveRate: snap ? Math.round(snap.fiveRate * 100) : 0,
-      confidenceLevel: snap?.confidenceLevel ?? "未知",
+      subjectCode: subject.subjectCode,
+      targetScore: subject.targetScore,
+      fiveRate: snapshot ? Math.round(snapshot.fiveRate * 100) : 0,
+      confidenceLevel: snapshot?.confidenceLevel ?? "unknown",
     };
   });
 
-  // Exam dates
   const examDates = await prisma.examDate.findMany({
     where: { classId: student.classId },
   });
+  type StudentExamDate = (typeof examDates)[number];
 
   return NextResponse.json({
     id: student.id,
@@ -107,9 +151,9 @@ export async function GET(
     avgTimed,
     avgUntimed,
     subjects,
-    examDates: examDates.map((e) => ({
-      subjectCode: e.subjectCode,
-      date: e.examDate.toISOString().split("T")[0],
+    examDates: examDates.map((examDate: StudentExamDate) => ({
+      subjectCode: examDate.subjectCode,
+      date: examDate.examDate.toISOString().split("T")[0],
     })),
   });
 }
