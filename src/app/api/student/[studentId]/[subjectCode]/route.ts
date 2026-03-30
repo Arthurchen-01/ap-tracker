@@ -64,6 +64,7 @@ export async function GET(
     subjectCode: decodedSubject,
     fiveRate,
     confidenceLevel: latestSnap?.confidenceLevel ?? "未知",
+    assessmentCount: assessments.length,
     examDate: examDate ? examDate.examDate.toISOString().split("T")[0] : null,
     mcqScores: mcqRecords.map((r) => ({
       date: r.takenAt.toISOString().split("T")[0],

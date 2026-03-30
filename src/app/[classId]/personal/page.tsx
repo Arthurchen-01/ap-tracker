@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
+  getConfidenceBadgeClass,
+  getConfidenceDescription,
+  getConfidenceLabel,
+} from "@/lib/confidence";
+import {
   Card,
   CardContent,
   CardHeader,
@@ -30,6 +35,7 @@ interface StudentData {
   name: string;
   classId: string;
   avgFiveRate: number;
+  overallConfidenceLevel: string;
   avgMcq: number;
   mcqTestCount: number;
   avgFrq: number;
@@ -102,14 +108,8 @@ export default function PersonalPage() {
 
   const currentStudent = studentData;
   const avgFiveRate = currentStudent.avgFiveRate;
-  const confidenceLevel =
-    avgFiveRate >= 75 ? "高" : avgFiveRate >= 55 ? "中" : "低";
-  const confidenceColor =
-    avgFiveRate >= 75
-      ? "bg-green-100 text-green-800"
-      : avgFiveRate >= 55
-      ? "bg-yellow-100 text-yellow-800"
-      : "bg-red-100 text-red-800";
+  const confidenceLevel = getConfidenceLabel(currentStudent.overallConfidenceLevel);
+  const confidenceColor = getConfidenceBadgeClass(currentStudent.overallConfidenceLevel);
 
   function handleStudentChange(sid: string | null) {
     if (sid) router.push(`/${classId}/personal?student=${sid}`);
@@ -156,6 +156,12 @@ export default function PersonalPage() {
               <Badge className={confidenceColor}>
                 置信等级：{confidenceLevel}
               </Badge>
+              <p className="mt-2 text-xs text-zinc-500">
+                {getConfidenceDescription(
+                  currentStudent.overallConfidenceLevel,
+                  currentStudent.mcqTestCount + currentStudent.frqTestCount,
+                )}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -257,7 +263,7 @@ export default function PersonalPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-zinc-500">置信等级</span>
                       <span className="font-bold text-blue-700">
-                        {sub.confidenceLevel}
+                        {getConfidenceLabel(sub.confidenceLevel)}
                       </span>
                     </div>
                     {examDateObj && (

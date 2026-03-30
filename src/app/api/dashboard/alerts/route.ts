@@ -35,8 +35,9 @@ export async function GET(req: Request) {
       where: { classId },
       select: { id: true, name: true },
     })
+    type AlertStudent = (typeof students)[number]
 
-    const studentIds = students.map((s) => s.id)
+    const studentIds = students.map((student: AlertStudent) => student.id)
     if (studentIds.length === 0) {
       return NextResponse.json({ riskStudents: [], inactiveStudents: [], volatileStudents: [] })
     }
@@ -49,10 +50,15 @@ export async function GET(req: Request) {
         orderBy: { snapshotDate: 'desc' },
         distinct: ['subjectCode'],
       })
+      type AlertSnapshot = (typeof snapshots)[number]
 
-      const lowRateSnapshots = snapshots.filter((s) => s.fiveRate < 0.5)
+      const lowRateSnapshots = snapshots.filter(
+        (snapshot: AlertSnapshot) => snapshot.fiveRate < 0.5
+      )
       if (lowRateSnapshots.length > 0) {
-        const worst = lowRateSnapshots.reduce((a, b) => (a.fiveRate < b.fiveRate ? a : b))
+        const worst = lowRateSnapshots.reduce(
+          (a: AlertSnapshot, b: AlertSnapshot) => (a.fiveRate < b.fiveRate ? a : b)
+        )
         riskStudents.push({
           studentId: student.id,
           name: student.name,
@@ -106,8 +112,11 @@ export async function GET(req: Request) {
       for (const [subjectCode, scores] of Object.entries(bySubject)) {
         if (scores.length < 3) continue
         const recent5 = scores.slice(0, 5)
-        const mean = recent5.reduce((a, b) => a + b, 0) / recent5.length
-        const variance = recent5.reduce((a, b) => a + (b - mean) ** 2, 0) / recent5.length
+        const mean =
+          recent5.reduce((a: number, b: number) => a + b, 0) / recent5.length
+        const variance =
+          recent5.reduce((a: number, b: number) => a + (b - mean) ** 2, 0) /
+          recent5.length
         const stdDev = Math.round(Math.sqrt(variance) * 10) / 10
 
         if (stdDev > 15) {

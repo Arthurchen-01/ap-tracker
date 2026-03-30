@@ -4,6 +4,11 @@ import { use, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
+  getConfidenceBadgeClass,
+  getConfidenceDescription,
+  getConfidenceLabel,
+} from "@/lib/confidence";
+import {
   Card,
   CardContent,
   CardHeader,
@@ -44,6 +49,7 @@ interface SubjectDetailData {
   subjectCode: string;
   fiveRate: number;
   confidenceLevel: string;
+  assessmentCount: number;
   examDate: string | null;
   mcqScores: ScoreEntry[];
   frqScores: ScoreEntry[];
@@ -110,14 +116,8 @@ export default function SubjectDetailPage({
   }
 
   const fiveRate = data.fiveRate;
-  const confidence =
-    fiveRate >= 75 ? "高" : fiveRate >= 55 ? "中" : "低";
-  const confidenceColor =
-    fiveRate >= 75
-      ? "bg-green-100 text-green-800"
-      : fiveRate >= 55
-      ? "bg-yellow-100 text-yellow-800"
-      : "bg-red-100 text-red-800";
+  const confidence = getConfidenceLabel(data.confidenceLevel);
+  const confidenceColor = getConfidenceBadgeClass(data.confidenceLevel);
 
   // Line chart data: prefer real snapshot history, fallback to trendData from API
   const trendChartData = snapshots.length > 0
@@ -173,6 +173,9 @@ export default function SubjectDetailPage({
               </span>
               <Badge className={confidenceColor}>置信{confidence}</Badge>
             </div>
+            <p className="text-sm text-zinc-500">
+              {getConfidenceDescription(data.confidenceLevel, data.assessmentCount)}
+            </p>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={trendChartData}>

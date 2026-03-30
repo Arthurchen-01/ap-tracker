@@ -1,5 +1,45 @@
-export function getConfidenceLevel(recordCount: number): 'high' | 'medium' | 'low' {
-  if (recordCount >= 5) return 'high'
-  if (recordCount >= 2) return 'medium'
-  return 'low'
+export type ConfidenceLevel = "high" | "medium" | "low";
+
+export function getConfidenceLevel(recordCount: number): ConfidenceLevel {
+  if (recordCount >= 5) return "high";
+  if (recordCount >= 2) return "medium";
+  return "low";
+}
+
+export function getConfidenceLabel(level: string): string {
+  if (level === "high") return "高";
+  if (level === "medium") return "中";
+  return "低";
+}
+
+export function getConfidenceBadgeClass(level: string): string {
+  if (level === "high") return "bg-green-100 text-green-800";
+  if (level === "medium") return "bg-yellow-100 text-yellow-800";
+  return "bg-red-100 text-red-800";
+}
+
+export function getConfidenceDescription(level: string, recordCount?: number): string {
+  const evidence =
+    typeof recordCount === "number"
+      ? `基于 ${recordCount} 次测试记录`
+      : "基于当前已有测试记录";
+
+  if (level === "high") return `${evidence}，当前判断较稳定。`;
+  if (level === "medium") return `${evidence}，当前判断可参考，但还需要更多数据。`;
+  return `${evidence}，当前判断波动较大，建议继续补充测试。`;
+}
+
+export function getAggregateConfidenceLevel(levels: string[]): ConfidenceLevel {
+  if (levels.length === 0) return "low";
+
+  const total = levels.reduce((sum, level) => {
+    if (level === "high") return sum + 2;
+    if (level === "medium") return sum + 1;
+    return sum;
+  }, 0);
+
+  const avg = total / levels.length;
+  if (avg >= 1.5) return "high";
+  if (avg >= 0.75) return "medium";
+  return "low";
 }

@@ -18,7 +18,7 @@ export async function GET(
   const classId = searchParams.get("classId");
 
   if (!classId) {
-    return NextResponse.json({ error: "缺少 classId" }, { status: 400 });
+    return NextResponse.json({ error: "Missing classId" }, { status: 400 });
   }
 
   const students = await prisma.student.findMany({
@@ -35,139 +35,226 @@ export async function GET(
     orderBy: { name: "asc" },
   });
 
+  type DashboardStudent = (typeof students)[number];
+  type DashboardSubject = DashboardStudent["subjects"][number];
+  type DashboardAssessment = DashboardStudent["assessments"][number];
+
   const metricType = metric as MetricType;
 
   if (metricType === "subjects") {
-    const totalSubjects = students.reduce((sum, s) => sum + s.subjects.length, 0);
-    const rows = students.map((s) => ({
-      studentId: s.id,
-      name: s.name,
-      count: s.subjects.length,
-      subjectList: s.subjects.map((sub) => sub.subjectCode).join("、"),
+    const totalSubjects = students.reduce(
+      (sum: number, student: DashboardStudent) =>
+        sum + student.subjects.length,
+      0
+    );
+
+    const rows = students.map((student: DashboardStudent) => ({
+      studentId: student.id,
+      name: student.name,
+      count: student.subjects.length,
+      subjectList: student.subjects
+        .map((subject: DashboardSubject) => subject.subjectCode)
+        .join(" / "),
     }));
+
     return NextResponse.json({
-      summaryText: `${totalSubjects}科 / ${students.length}人 / 人均${(totalSubjects / students.length).toFixed(1)}科`,
+      summaryText: `${totalSubjects} subjects across ${students.length} students`,
       rows,
     });
   }
 
   if (metricType === "five-rate") {
-    // Latest snapshot per student-subject
-    const rows = students.map((s) => {
+    const rows = students.map((student: DashboardStudent) => {
       const latestSnapshots = new Map<string, number>();
-      for (const snap of s.snapshots) {
-        if (!latestSnapshots.has(snap.subjectCode)) {
-          latestSnapshots.set(snap.subjectCode, snap.fiveRate);
+
+      for (const snapshot of student.snapshots) {
+        if (!latestSnapshots.has(snapshot.subjectCode)) {
+          latestSnapshots.set(snapshot.subjectCode, snapshot.fiveRate);
         }
       }
-      const rates = Array.from(latestSnapshots.values());
-      const avg =
-        rates.length > 0 ? rates.reduce((a, b) => a + b, 0) / rates.length : 0;
-      const subjectCodes = Array.from(latestSnapshots.keys());
 
-      let highest = subjectCodes[0] ?? "";
-      let lowest = subjectCodes[0] ?? "";
+      const rates = Array.from(latestSnapshots.values());
+      const avgRate =
+        rates.length > 0
+          ? rates.reduce((a: number, b: number) => a + b, 0) / rates.length
+          : 0;
+
+      let highest = "";
+      let lowest = "";
       let maxRate = -Infinity;
       let minRate = Infinity;
+
       for (const [code, rate] of latestSnapshots) {
-        if (rate > maxRate) { maxRate = rate; highest = code; }
-        if (rate < minRate) { minRate = rate; lowest = code; }
+        if (rate > maxRate) {
+          maxRate = rate;
+          highest = code;
+        }
+        if (rate < minRate) {
+          minRate = rate;
+          lowest = code;
+        }
       }
 
       return {
-        studentId: s.id,
-        name: s.name,
-        avgRate: Math.round(avg * 100),
+        studentId: student.id,
+        name: student.name,
+        avgRate: Math.round(avgRate * 100),
         highest,
         lowest,
-        risk: avg,
+        risk: avgRate,
       };
     });
 
-    // Overall avg
-    let sum = 0, count = 0;
-    for (const r of rows) { sum += r.risk; count++; }
-    const overallAvg = count > 0 ? Math.round((sum / count) * 100) : 0;
+    const overallAvg =
+      rows.length > 0
+        ? Math.round(
+            (
+              rows.reduce(
+                (sum: number, row: { risk: number }) => sum + row.risk,
+                0
+              ) / rows.length
+            ) * 100
+          )
+        : 0;
 
     return NextResponse.json({
-      summaryText: `整体 ${overallAvg}%`,
+      summaryText: `Overall ${overallAvg}%`,
       rows,
     });
   }
 
   if (metricType === "mcq") {
-    const rows = students.map((s) => {
-      const mcqRecords = s.assessments.filter((a) => a.recordType === "MCQ" && a.scorePercent != null);
-      const scores = mcqRecords.map((r) => r.scorePercent!);
-      const avg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+    const rows = students.map((student: DashboardStudent) => {
+      const mcqRecords = student.assessments.filter(
+        (assessment: DashboardAssessment) =>
+          assessment.recordType === "MCQ" && assessment.scorePercent != null
+      );
+      const scores = mcqRecords.map(
+        (record: DashboardAssessment) => record.scorePercent as number
+      );
+      const avgScore =
+        scores.length > 0
+          ? scores.reduce((a: number, b: number) => a + b, 0) / scores.length
+          : 0;
 
-      // Group by subject for latest
-      const bySubject = new Map<string, number[]>();
-      for (const r of mcqRecords) {
-        if (!bySubject.has(r.subjectCode)) bySubject.set(r.subjectCode, []);
-        bySubject.get(r.subjectCode)!.push(r.scorePercent!);
-      }
-      const latestPerSubject = Array.from(bySubject.values()).map((arr) => arr[0]);
+      const latestPerSubject = getLatestScoresBySubject(mcqRecords);
 
       return {
-        studentId: s.id,
-        name: s.name,
-        avgScore: Math.round(avg),
-        highest: latestPerSubject.length > 0 ? Math.round(Math.max(...latestPerSubject)) : 0,
-        lowest: latestPerSubject.length > 0 ? Math.round(Math.min(...latestPerSubject)) : 0,
+        studentId: student.id,
+        name: student.name,
+        avgScore: Math.round(avgScore),
+        highest:
+          latestPerSubject.length > 0
+            ? Math.round(Math.max(...latestPerSubject))
+            : 0,
+        lowest:
+          latestPerSubject.length > 0
+            ? Math.round(Math.min(...latestPerSubject))
+            : 0,
         trend: getTrendArrow(scores.slice(-3)),
       };
     });
 
-    let mcqSum = 0, mcqCount = 0;
-    for (const r of rows) { mcqSum += r.avgScore; mcqCount++; }
+    const classAvg =
+      rows.length > 0
+        ? Math.round(
+            rows.reduce(
+              (sum: number, row: { avgScore: number }) => sum + row.avgScore,
+              0
+            ) / rows.length
+          )
+        : 0;
 
     return NextResponse.json({
-      summaryText: `班级平均 ${mcqCount > 0 ? Math.round(mcqSum / mcqCount) : 0}%`,
+      summaryText: `Class average ${classAvg}%`,
       rows,
     });
   }
 
   if (metricType === "frq") {
-    const rows = students.map((s) => {
-      const frqRecords = s.assessments.filter((a) => a.recordType === "FRQ" && a.scorePercent != null);
-      const scores = frqRecords.map((r) => r.scorePercent!);
-      const avg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+    const rows = students.map((student: DashboardStudent) => {
+      const frqRecords = student.assessments.filter(
+        (assessment: DashboardAssessment) =>
+          assessment.recordType === "FRQ" && assessment.scorePercent != null
+      );
+      const scores = frqRecords.map(
+        (record: DashboardAssessment) => record.scorePercent as number
+      );
+      const avgScore =
+        scores.length > 0
+          ? scores.reduce((a: number, b: number) => a + b, 0) / scores.length
+          : 0;
 
-      const bySubject = new Map<string, number[]>();
-      for (const r of frqRecords) {
-        if (!bySubject.has(r.subjectCode)) bySubject.set(r.subjectCode, []);
-        bySubject.get(r.subjectCode)!.push(r.scorePercent!);
-      }
-      const latestPerSubject = Array.from(bySubject.values()).map((arr) => arr[0]);
+      const latestPerSubject = getLatestScoresBySubject(frqRecords);
 
       return {
-        studentId: s.id,
-        name: s.name,
-        avgScore: Math.round(avg),
-        highest: latestPerSubject.length > 0 ? Math.round(Math.max(...latestPerSubject)) : 0,
-        lowest: latestPerSubject.length > 0 ? Math.round(Math.min(...latestPerSubject)) : 0,
+        studentId: student.id,
+        name: student.name,
+        avgScore: Math.round(avgScore),
+        highest:
+          latestPerSubject.length > 0
+            ? Math.round(Math.max(...latestPerSubject))
+            : 0,
+        lowest:
+          latestPerSubject.length > 0
+            ? Math.round(Math.min(...latestPerSubject))
+            : 0,
         trend: getTrendArrow(scores.slice(-3)),
       };
     });
 
-    let frqSum = 0, frqCount = 0;
-    for (const r of rows) { frqSum += r.avgScore; frqCount++; }
+    const classAvg =
+      rows.length > 0
+        ? Math.round(
+            rows.reduce(
+              (sum: number, row: { avgScore: number }) => sum + row.avgScore,
+              0
+            ) / rows.length
+          )
+        : 0;
 
     return NextResponse.json({
-      summaryText: `班级平均 ${frqCount > 0 ? Math.round(frqSum / frqCount) : 0}%`,
+      summaryText: `Class average ${classAvg}%`,
       rows,
     });
   }
 
-  return NextResponse.json({ error: "未知指标" }, { status: 400 });
+  return NextResponse.json({ error: "Unknown metric" }, { status: 400 });
+}
+
+function getLatestScoresBySubject(records: Array<{ subjectCode: string; scorePercent: number | null }>) {
+  const bySubject = new Map<string, number[]>();
+
+  for (const record of records) {
+    if (record.scorePercent == null) {
+      continue;
+    }
+
+    if (!bySubject.has(record.subjectCode)) {
+      bySubject.set(record.subjectCode, []);
+    }
+
+    bySubject.get(record.subjectCode)?.push(record.scorePercent);
+  }
+
+  return Array.from(bySubject.values()).map((scores: number[]) => scores[0]);
 }
 
 function getTrendArrow(scores: number[]): string {
-  if (scores.length < 2) return "→";
+  if (scores.length < 2) {
+    return "flat";
+  }
+
   const last = scores[scores.length - 1];
   const prev = scores[scores.length - 2];
-  if (last > prev + 2) return "↑";
-  if (last < prev - 2) return "↓";
-  return "→";
+
+  if (last > prev + 2) {
+    return "up";
+  }
+
+  if (last < prev - 2) {
+    return "down";
+  }
+
+  return "flat";
 }

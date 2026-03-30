@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAggregateConfidenceLevel } from "@/lib/confidence";
 
 export async function GET(
   request: Request,
@@ -41,6 +42,9 @@ export async function GET(
     fiveRates.length > 0
       ? Math.round((fiveRates.reduce((a, b) => a + b, 0) / fiveRates.length) * 100)
       : 0;
+  const overallConfidenceLevel = getAggregateConfidenceLevel(
+    Array.from(latestSnapshots.values()).map((s) => s.confidenceLevel),
+  );
 
   // MCQ stats
   const mcqRecords = student.assessments.filter(
@@ -95,6 +99,7 @@ export async function GET(
     name: student.name,
     classId: student.classId,
     avgFiveRate,
+    overallConfidenceLevel,
     avgMcq,
     mcqTestCount: mcqRecords.length,
     avgFrq,

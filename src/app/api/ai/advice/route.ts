@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { generateAdvice, StudentContext } from '@/lib/ai-advisor'
+import { getConfidenceLevel } from '@/lib/confidence'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -45,15 +46,17 @@ export async function GET(request: Request) {
         Math.round(snapshots[snapshots.length - 1].fiveRate * 100)
     }
 
-    const confidenceLevel =
-      latestRate >= 75 ? '高' : latestRate >= 55 ? '中' : '低'
-
     // Find weakest units (from assessment records)
     const recentRecords = await prisma.assessmentRecord.findMany({
       where: { studentId: sid, subjectCode: sub.subjectCode },
       orderBy: { takenAt: 'desc' },
       take: 10,
     })
+
+    const confidenceLevel =
+      snapshots.length > 0
+        ? snapshots[0].confidenceLevel
+        : getConfidenceLevel(recentRecords.length)
 
     const weakestUnits: string[] = []
     if (latestRate < 60) {
