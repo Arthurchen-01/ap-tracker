@@ -11,10 +11,10 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -23,8 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-// ---------- Types ----------
+import { InfoChip } from "@/components/info-chip";
 
 interface ResourceItem {
   id: string;
@@ -37,8 +36,6 @@ interface ResourceItem {
   createdAt: string;
   student: { id: string; name: string };
 }
-
-// ---------- Constants ----------
 
 const SUBJECT_OPTIONS = [
   "AP Macro",
@@ -72,27 +69,34 @@ const typeLabels: Record<string, string> = {
   flashcards: "闪卡",
 };
 
+function getRecommendationText(resourceType: string) {
+  if (resourceType === "practice") {
+    return "更适合想马上动手补练的同学。";
+  }
+  if (resourceType === "video") {
+    return "更适合先快速补概念、补框架。";
+  }
+  if (resourceType === "flashcards") {
+    return "更适合短时回顾和碎片时间复习。";
+  }
+  return "更适合先把知识点结构梳理清楚。";
+}
+
 export default function ResourcesPage() {
-  const params = useParams();
-  const classId = params.classId as string;
+  useParams();
 
   const [resources, setResources] = useState<ResourceItem[]>([]);
   const [filterSubject, setFilterSubject] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-
-  // Form state
   const [formTitle, setFormTitle] = useState("");
   const [formSubject, setFormSubject] = useState("");
   const [formType, setFormType] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formUrl, setFormUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-  // Current user
   const [currentUserId, setCurrentUserId] = useState<string>("");
 
-  // Fetch resources
   function fetchResources() {
     const url =
       filterSubject === "all"
@@ -111,7 +115,6 @@ export default function ResourcesPage() {
     fetchResources();
   }, [filterSubject]);
 
-  // Get current user
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
@@ -120,7 +123,6 @@ export default function ResourcesPage() {
       });
   }, []);
 
-  // Submit handler
   async function handleSubmit() {
     if (!formTitle || !formSubject || !formType) return;
 
@@ -132,22 +134,20 @@ export default function ResourcesPage() {
         body: JSON.stringify({
           uploaderId: currentUserId,
           subjectCode: formSubject,
-          title: formTitle,
           resourceType: formType,
+          title: formTitle,
           description: formDescription || null,
           url: formUrl || null,
         }),
       });
 
       if (res.ok) {
-        // Reset form
         setFormTitle("");
         setFormSubject("");
         setFormType("");
         setFormDescription("");
         setFormUrl("");
         setDialogOpen(false);
-        // Refresh list
         fetchResources();
       }
     } finally {
@@ -163,10 +163,17 @@ export default function ResourcesPage() {
   return (
     <div>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold text-zinc-900">资源共享</h1>
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-zinc-900">资源共享</h1>
+            <InfoChip tip="资源页不只是堆文件，而是帮助学生快速判断这份资料为什么值得看。"/>
+          </div>
+          <p className="mt-2 text-sm text-zinc-500">
+            优先分享“为什么推荐”“适合什么阶段”的资料，而不只是简单丢链接。
+          </p>
+        </div>
 
         <div className="flex items-center gap-3">
-          {/* Subject filter */}
           <select
             value={filterSubject}
             onChange={(e) => setFilterSubject(e.target.value)}
@@ -180,11 +187,8 @@ export default function ResourcesPage() {
             ))}
           </select>
 
-          {/* Upload button + dialog */}
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger render={<Button size="sm" />}>
-              上传资源
-            </DialogTrigger>
+            <DialogTrigger render={<Button size="sm" />}>上传资源</DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>上传资源</DialogTitle>
@@ -230,10 +234,10 @@ export default function ResourcesPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="description">简介</Label>
+                  <Label htmlFor="description">为什么推荐</Label>
                   <Textarea
                     id="description"
-                    placeholder="简要描述资源内容"
+                    placeholder="例如：这份资料适合临考前快速梳理 FRQ 框架。"
                     value={formDescription}
                     onChange={(e) => setFormDescription(e.target.value)}
                   />
@@ -249,10 +253,7 @@ export default function ResourcesPage() {
                 </div>
               </div>
               <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setDialogOpen(false)}
-                >
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>
                   取消
                 </Button>
                 <Button
@@ -268,9 +269,9 @@ export default function ResourcesPage() {
       </div>
 
       {loading ? (
-        <p className="text-center text-zinc-500">加载中...</p>
+        <p className="text-center text-zinc-500">正在加载资源...</p>
       ) : filtered.length === 0 ? (
-        <p className="text-center text-zinc-500">暂无资源</p>
+        <p className="text-center text-zinc-500">当前还没有资源。</p>
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((res) => (
@@ -285,22 +286,22 @@ export default function ResourcesPage() {
                   </Badge>
                   <Badge variant="outline">{res.subjectCode}</Badge>
                 </div>
-                <CardTitle className="text-base leading-snug">
-                  {res.title}
-                </CardTitle>
+                <CardTitle className="text-base leading-snug">{res.title}</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-1 flex-col justify-between pt-0">
-                <p className="mb-3 text-sm text-zinc-600">
-                  {res.description || "暂无简介"}
-                </p>
+                <div>
+                  <p className="mb-3 text-sm text-zinc-600">
+                    {res.description || "上传者还没有补充推荐理由。"}
+                  </p>
+                  <div className="mb-4 rounded-xl bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+                    推荐理由：{getRecommendationText(res.resourceType)}
+                  </div>
+                </div>
                 <div className="flex items-center justify-between text-xs text-zinc-400">
-                  <span>上传人：{res.student.name}</span>
+                  <span>上传者：{res.student.name}</span>
                   {res.url && (
-                    <a
-                      href={res.url}
-                      className="font-medium text-zinc-700 hover:underline"
-                    >
-                      查看 →
+                    <a href={res.url} className="font-medium text-zinc-700 hover:underline">
+                      查看资源 →
                     </a>
                   )}
                 </div>

@@ -7,12 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
-// ---------- Constants ----------
+import { InfoChip } from "@/components/info-chip";
 
 const TASK_TYPES = [
-  "MCQ练习",
-  "FRQ练习",
+  "MCQ 练习",
+  "FRQ 练习",
   "整套模考",
   "知识点复习",
   "错题整理",
@@ -20,7 +19,7 @@ const TASK_TYPES = [
   "其他",
 ] as const;
 
-const ANSWER_CONDITIONS = ["计时", "不计时", "不适用"] as const;
+const ANSWER_CONDITIONS = ["计时", "非计时", "不适用"] as const;
 
 const SUBJECTS = [
   { code: "AP-Macro", name: "AP 宏观经济学" },
@@ -28,7 +27,7 @@ const SUBJECTS = [
   { code: "AP-Calc-AB", name: "AP 微积分 AB" },
   { code: "AP-Calc-BC", name: "AP 微积分 BC" },
   { code: "AP-Phys1", name: "AP 物理 1" },
-  { code: "AP-PhysC-Mech", name: "AP 物理 C: 力学" },
+  { code: "AP-PhysC-Mech", name: "AP 物理 C 力学" },
   { code: "AP-CSA", name: "AP 计算机科学 A" },
   { code: "AP-Stat", name: "AP 统计学" },
   { code: "AP-EngLang", name: "AP 英语语言" },
@@ -93,7 +92,7 @@ export default function DailyUpdatePage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.subjectCode || !form.activityType) {
-      alert("请填写所有必填项（带 * 号）");
+      alert("请先填写带 * 的必填项。");
       return;
     }
 
@@ -120,7 +119,6 @@ export default function DailyUpdatePage() {
         setRateChange(result);
         setTimeout(() => setSuccess(false), 5000);
         loadRecords();
-        // Reset form but keep date
         setForm({
           date: today,
           subjectCode: "",
@@ -139,47 +137,70 @@ export default function DailyUpdatePage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="mb-6 text-2xl font-bold text-zinc-900">每日更新</h1>
+      <div className="mb-6">
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-zinc-900">每日更新</h1>
+          <InfoChip tip="这页要尽量轻，重点是让学生每天愿意填，老师第二天看得懂。"/>
+        </div>
+        <p className="mt-2 text-sm text-zinc-500">
+          只记今天最重要的一次或几次学习活动，别把它做成很重的打卡表。
+        </p>
+      </div>
+
+      <Card className="mb-4 border-zinc-200 bg-zinc-50">
+        <CardContent className="pt-5 text-sm leading-6 text-zinc-600">
+          推荐最少填写 4 件事：学了哪一科、做了什么、是否计时、结果怎么样。
+          如果今天有特别卡住的点，也可以写在“补充说明”里。
+        </CardContent>
+      </Card>
 
       {success && (
-        <div className="mb-4 rounded-md bg-green-50 p-3 text-sm text-green-800 border border-green-200">
-          ✅ 记录已成功保存！
+        <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+          已成功保存。系统会根据这次更新重新估算 5 分率。
         </div>
       )}
 
       {rateChange && (
         <Card className="mb-4 border-l-4 border-l-blue-500">
           <CardHeader>
-            <CardTitle className="text-base">📊 5 分率变化</CardTitle>
+            <CardTitle className="text-base">这次更新带来的变化</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
               <div className="text-center">
-                <div className="text-sm text-zinc-500">旧值</div>
+                <div className="text-sm text-zinc-500">更新前</div>
                 <div className="text-2xl font-bold text-zinc-600">{rateChange.oldRate}%</div>
               </div>
-              <div className="text-2xl">
-                {rateChange.change > 0 ? "→" : rateChange.change < 0 ? "→" : "→"}
-              </div>
+              <div className="text-2xl text-zinc-300">→</div>
               <div className="text-center">
-                <div className="text-sm text-zinc-500">新值</div>
-                <div className={`text-2xl font-bold ${rateChange.newRate >= rateChange.oldRate ? "text-green-700" : "text-red-700"}`}>
+                <div className="text-sm text-zinc-500">更新后</div>
+                <div
+                  className={`text-2xl font-bold ${
+                    rateChange.newRate >= rateChange.oldRate
+                      ? "text-green-700"
+                      : "text-red-700"
+                  }`}
+                >
                   {rateChange.newRate}%
                 </div>
               </div>
-              <div className={`text-lg font-semibold px-3 py-1 rounded-full ${
-                rateChange.change > 0
-                  ? "bg-green-100 text-green-700"
+              <div
+                className={`rounded-full px-3 py-1 text-lg font-semibold ${
+                  rateChange.change > 0
+                    ? "bg-green-100 text-green-700"
+                    : rateChange.change < 0
+                      ? "bg-red-100 text-red-700"
+                      : "bg-zinc-100 text-zinc-600"
+                }`}
+              >
+                {rateChange.change > 0
+                  ? `+${rateChange.change}%`
                   : rateChange.change < 0
-                  ? "bg-red-100 text-red-700"
-                  : "bg-zinc-100 text-zinc-600"
-              }`}>
-                {rateChange.change > 0 ? `↑ +${rateChange.change}%` : rateChange.change < 0 ? `↓ ${rateChange.change}%` : "→ 0%"}
+                    ? `${rateChange.change}%`
+                    : "0%"}
               </div>
             </div>
-            <p className="text-sm text-zinc-600 leading-relaxed">
-              {rateChange.explanation}
-            </p>
+            <p className="text-sm leading-relaxed text-zinc-600">{rateChange.explanation}</p>
           </CardContent>
         </Card>
       )}
@@ -187,10 +208,9 @@ export default function DailyUpdatePage() {
       <form onSubmit={handleSubmit}>
         <Card>
           <CardHeader>
-            <CardTitle>填写今日学习记录</CardTitle>
+            <CardTitle>填写今天的学习记录</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
-            {/* Date */}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="date">日期</Label>
               <Input
@@ -201,7 +221,6 @@ export default function DailyUpdatePage() {
               />
             </div>
 
-            {/* Subject */}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="subjectCode">
                 科目 <span className="text-red-500">*</span>
@@ -221,7 +240,6 @@ export default function DailyUpdatePage() {
               </select>
             </div>
 
-            {/* Task Type */}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="activityType">
                 任务类型 <span className="text-red-500">*</span>
@@ -241,7 +259,6 @@ export default function DailyUpdatePage() {
               </select>
             </div>
 
-            {/* Answer Condition */}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="timedMode">作答条件</Label>
               <select
@@ -259,15 +276,14 @@ export default function DailyUpdatePage() {
               </select>
             </div>
 
-            {/* Score fields */}
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="scoreRaw">得分</Label>
+                <Label htmlFor="scoreRaw">原始得分</Label>
                 <Input
                   id="scoreRaw"
                   type="number"
                   min={0}
-                  placeholder="如 85"
+                  placeholder="例如 85"
                   value={form.scoreRaw}
                   onChange={(e) => updateField("scoreRaw", e.target.value)}
                 />
@@ -279,51 +295,47 @@ export default function DailyUpdatePage() {
                   type="number"
                   min={0}
                   max={100}
-                  placeholder="如 80"
+                  placeholder="例如 80"
                   value={form.scorePercent}
                   onChange={(e) => updateField("scorePercent", e.target.value)}
                 />
               </div>
             </div>
 
-            {/* Duration */}
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="durationMinutes">花费时间（分钟）</Label>
+              <Label htmlFor="durationMinutes">花了多久（分钟）</Label>
               <Input
                 id="durationMinutes"
                 type="number"
                 min={0}
-                placeholder="如 60"
+                placeholder="例如 60"
                 value={form.durationMinutes}
                 onChange={(e) => updateField("durationMinutes", e.target.value)}
               />
             </div>
 
-            {/* Description */}
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="description">描述</Label>
+              <Label htmlFor="description">补充说明</Label>
               <Textarea
                 id="description"
-                placeholder="详细描述今天的学习内容，例如：复习了 Macro Unit 3，做了 20 道 MCQ，错了 4 道，整理了错因…"
+                placeholder="例如：复习了 Macro Unit 3，做了 20 道 MCQ，错了 4 题，发现图像题还是慢。"
                 rows={4}
                 value={form.description}
                 onChange={(e) => updateField("description", e.target.value)}
               />
             </div>
 
-            {/* Submit */}
             <Button type="submit" className="mt-2 w-full" disabled={submitting}>
-              {submitting ? "提交中..." : "提交记录"}
+              {submitting ? "提交中..." : "提交今天的记录"}
             </Button>
           </CardContent>
         </Card>
       </form>
 
-      {/* History */}
       {records.length > 0 && (
         <Card className="mt-8">
           <CardHeader>
-            <CardTitle>历史更新记录</CardTitle>
+            <CardTitle>最近更新记录</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
@@ -340,18 +352,12 @@ export default function DailyUpdatePage() {
               <TableBody>
                 {records.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell>
-                      {new Date(r.updateDate).toLocaleDateString("zh-CN")}
-                    </TableCell>
+                    <TableCell>{new Date(r.updateDate).toLocaleDateString("zh-CN")}</TableCell>
                     <TableCell>{r.subjectCode}</TableCell>
                     <TableCell>{r.activityType}</TableCell>
-                    <TableCell>
-                      {r.durationMinutes ? `${r.durationMinutes} 分钟` : "-"}
-                    </TableCell>
+                    <TableCell>{r.durationMinutes ? `${r.durationMinutes} 分钟` : "-"}</TableCell>
                     <TableCell>{r.scoreRaw ?? "-"}</TableCell>
-                    <TableCell>
-                      {r.scorePercent != null ? `${r.scorePercent}%` : "-"}
-                    </TableCell>
+                    <TableCell>{r.scorePercent != null ? `${r.scorePercent}%` : "-"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -1,16 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
-
-// ---------- Types ----------
+import { InfoChip } from "@/components/info-chip";
 
 interface StudentInfo {
   id: string;
@@ -26,28 +25,26 @@ interface ExamInfo {
   avgFiveRate: number;
 }
 
-// ---------- Constants ----------
-
 const SUBJECT_SHORT: Record<string, string> = {
+  "AP-BIO": "Bio",
+  "AP-CHEM": "Chem",
+  "AP-ENGLANG": "Lang",
+  "AP-STATS": "Stats",
   "AP-MACRO": "Macro",
   "AP-MICRO": "Micro",
   "AP-CALCBC": "Calc BC",
-  "AP-STATS": "Stats",
   "AP-PHYSICS": "Physics",
-  "AP-CHEM": "Chem",
-  "AP-BIO": "Bio",
-  "AP-ENGLANG": "Eng Lang",
 };
 
 const SUBJECT_NAME: Record<string, string> = {
+  "AP-BIO": "AP Biology",
+  "AP-CHEM": "AP Chemistry",
+  "AP-ENGLANG": "AP English Lang",
+  "AP-STATS": "AP Statistics",
   "AP-MACRO": "AP Macro",
   "AP-MICRO": "AP Micro",
   "AP-CALCBC": "AP Calc BC",
-  "AP-STATS": "AP Stats",
   "AP-PHYSICS": "AP Physics",
-  "AP-CHEM": "AP Chemistry",
-  "AP-BIO": "AP Biology",
-  "AP-ENGLANG": "AP English Lang",
 };
 
 const EXAM_TIME: Record<string, string> = {
@@ -55,13 +52,11 @@ const EXAM_TIME: Record<string, string> = {
   "AP-CHEM": "上午 8:00",
   "AP-ENGLANG": "上午 8:00",
   "AP-STATS": "上午 8:00",
-  "AP-MACRO": "下午 12:00",
+  "AP-MACRO": "中午 12:00",
   "AP-MICRO": "下午 2:00",
   "AP-CALCBC": "上午 8:00",
   "AP-PHYSICS": "上午 8:00",
 };
-
-// ---------- Helpers ----------
 
 function getDaysUntil(dateStr: string): number {
   const today = new Date();
@@ -99,8 +94,6 @@ function getMay2026Grid() {
   return cells;
 }
 
-// ---------- Component ----------
-
 export function ExamCalendar() {
   const params = useParams();
   const classId = params.classId as string;
@@ -110,13 +103,10 @@ export function ExamCalendar() {
   useEffect(() => {
     if (!classId) return;
 
-    // Fetch exam dates + students + snapshots
     Promise.all([
       fetch(`/api/dashboard?classId=${classId}`).then((r) => r.json()),
       fetch(`/api/students?classId=${classId}`).then((r) => r.json()),
     ]).then(async ([, students]) => {
-      // Fetch exam dates from a dedicated endpoint or use dashboard data
-      // For now, hardcode May 2026 AP dates and fetch per-subject data
       const examDates = [
         { code: "AP-BIO", date: "2026-05-04" },
         { code: "AP-CHEM", date: "2026-05-05" },
@@ -139,7 +129,7 @@ export function ExamCalendar() {
             const data = await resp.json();
             const sub = data.subjects?.find(
               (s: { subjectCode: string; fiveRate: number }) =>
-                s.subjectCode === ed.code
+                s.subjectCode === ed.code,
             );
             if (sub) {
               subjectStudents.push({
@@ -155,7 +145,7 @@ export function ExamCalendar() {
           subjectStudents.length > 0
             ? Math.round(
                 subjectStudents.reduce((s, x) => s + x.fiveRate, 0) /
-                  subjectStudents.length
+                  subjectStudents.length,
               )
             : 0;
 
@@ -184,23 +174,19 @@ export function ExamCalendar() {
 
   return (
     <div className="mt-8">
-      <h2 className="text-xl font-bold text-zinc-900 mb-4">
-        2026年5月 AP 考试日历
-      </h2>
+      <div className="mb-4 flex items-center gap-2">
+        <h2 className="text-xl font-bold text-zinc-900">2026 年 5 月 AP 考试日历</h2>
+        <InfoChip tip="颜色优先反映离考试远近和对应学科平均 5 分率，用来帮助老师排复习顺序。"/>
+      </div>
 
-      {/* Weekday headers */}
-      <div className="grid grid-cols-7 gap-1 mb-1">
+      <div className="mb-1 grid grid-cols-7 gap-1">
         {weekDays.map((d) => (
-          <div
-            key={d}
-            className="text-center text-xs font-medium text-zinc-500 py-1"
-          >
+          <div key={d} className="py-1 text-center text-xs font-medium text-zinc-500">
             {d}
           </div>
         ))}
       </div>
 
-      {/* Calendar grid */}
       <div className="grid grid-cols-7 gap-1">
         {cells.map((day, idx) => {
           if (day === null) {
@@ -214,11 +200,9 @@ export function ExamCalendar() {
             return (
               <div
                 key={day}
-                className="h-20 md:h-24 rounded-lg border border-zinc-100 bg-zinc-50 p-1.5 flex flex-col"
+                className="flex h-20 flex-col rounded-lg border border-zinc-100 bg-zinc-50 p-1.5 md:h-24"
               >
-                <span className="text-xs text-zinc-300 font-medium">
-                  {day}
-                </span>
+                <span className="text-xs font-medium text-zinc-300">{day}</span>
               </div>
             );
           }
@@ -231,7 +215,7 @@ export function ExamCalendar() {
             <button
               key={day}
               onClick={() => setSelectedExam(dayExams[0])}
-              className={`h-24 md:h-28 rounded-lg border-2 p-1.5 flex flex-col items-start text-left transition-all hover:shadow-md hover:scale-[1.03] cursor-pointer ${colorClass}`}
+              className={`flex h-24 flex-col items-start rounded-lg border-2 p-1.5 text-left transition-all hover:scale-[1.03] hover:shadow-md md:h-28 ${colorClass}`}
             >
               <span className="text-sm font-bold">{day}</span>
               {dayExams.map((ex, i) => (
@@ -240,47 +224,31 @@ export function ExamCalendar() {
                     {SUBJECT_SHORT[ex.subjectCode] ?? ex.subjectCode}
                   </div>
                   <div className="text-[10px] leading-tight opacity-80">
-                    {ex.students.length}人 · {ex.avgFiveRate}%
+                    {ex.students.length} 人 · {ex.avgFiveRate}%
                   </div>
                 </div>
               ))}
-              <span className="mt-auto text-[10px] opacity-60">
-                距今{daysUntil}天
-              </span>
+              <span className="mt-auto text-[10px] opacity-60">距今 {daysUntil} 天</span>
             </button>
           );
         })}
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3 mt-4 text-xs text-zinc-500">
+      <div className="mt-4 flex flex-wrap gap-3 text-xs text-zinc-500">
         <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-green-200 border border-green-400" />
-          5分率≥70% 近
+          <span className="h-3 w-3 rounded border border-green-400 bg-green-200" />
+          近两周内且平均 5 分率较稳
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-green-50 border border-green-200" />
-          5分率≥70% 远
+          <span className="h-3 w-3 rounded border border-orange-400 bg-orange-200" />
+          近两周内但还有明显压力
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-orange-200 border border-orange-400" />
-          50-70% 近
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-orange-50 border border-orange-200" />
-          50-70% 远
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-red-200 border border-red-400" />
-          &lt;50% 近
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-red-50 border border-red-200" />
-          &lt;50% 远
+          <span className="h-3 w-3 rounded border border-red-400 bg-red-200" />
+          近两周内且需要优先关注
         </span>
       </div>
 
-      {/* Detail dialog */}
       <Dialog
         open={!!selectedExam}
         onOpenChange={(open) => {
@@ -291,25 +259,20 @@ export function ExamCalendar() {
           {selectedExam && (
             <>
               <DialogHeader>
-                <DialogTitle>
-                  {selectedExam.subjectName} —{" "}
-                  {selectedExam.date.replace("2026-", "").replace("-", "月")}日
-                </DialogTitle>
+                <DialogTitle>{selectedExam.subjectName}</DialogTitle>
                 <DialogDescription>
-                  考试时间：{EXAM_TIME[selectedExam.subjectCode] ?? "待定"} ｜
-                  班级平均 5 分概率：{selectedExam.avgFiveRate}%
+                  考试时间：{EXAM_TIME[selectedExam.subjectCode] ?? "待定"} · 班级平均 5 分率：
+                  {selectedExam.avgFiveRate}%
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
+              <div className="max-h-64 space-y-2 overflow-y-auto">
                 {selectedExam.students.map((stu) => {
                   const atRisk = stu.fiveRate < 60;
                   return (
                     <div
                       key={stu.id}
-                      className={`flex justify-between items-center px-3 py-2 rounded-lg ${
-                        atRisk
-                          ? "bg-red-50 border border-red-200"
-                          : "bg-zinc-50"
+                      className={`flex items-center justify-between rounded-lg px-3 py-2 ${
+                        atRisk ? "border border-red-200 bg-red-50" : "bg-zinc-50"
                       }`}
                     >
                       <span
@@ -319,9 +282,7 @@ export function ExamCalendar() {
                       >
                         {stu.name}
                         {atRisk && (
-                          <span className="ml-2 text-xs text-red-500">
-                            ⚠ 风险
-                          </span>
+                          <span className="ml-2 text-xs text-red-500">需要优先关注</span>
                         )}
                       </span>
                       <span

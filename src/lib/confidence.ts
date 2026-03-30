@@ -18,15 +18,22 @@ export function getConfidenceBadgeClass(level: string): string {
   return "bg-red-100 text-red-800";
 }
 
-export function getConfidenceDescription(level: string, recordCount?: number): string {
+export function getConfidenceDescription(
+  level: string,
+  recordCount?: number,
+): string {
   const evidence =
     typeof recordCount === "number"
-      ? `基于 ${recordCount} 次测试记录`
+      ? `基于最近 ${recordCount} 次有效测试`
       : "基于当前已有测试记录";
 
-  if (level === "high") return `${evidence}，当前判断较稳定。`;
-  if (level === "medium") return `${evidence}，当前判断可参考，但还需要更多数据。`;
-  return `${evidence}，当前判断波动较大，建议继续补充测试。`;
+  if (level === "high") {
+    return `${evidence}，当前判断比较稳定，可以作为近期复习安排的重要参考。`;
+  }
+  if (level === "medium") {
+    return `${evidence}，当前判断已经有参考价值，但还建议继续补充测试。`;
+  }
+  return `${evidence}，当前判断波动较大，建议先补更多有效测试再下结论。`;
 }
 
 export function getAggregateConfidenceLevel(levels: string[]): ConfidenceLevel {
