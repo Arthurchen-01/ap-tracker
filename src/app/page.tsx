@@ -19,6 +19,8 @@ export default async function Home() {
       },
     },
   });
+  type HomeClass = (typeof classes)[number];
+  type HomeStudent = HomeClass["students"][number];
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -33,9 +35,9 @@ export default async function Home() {
         </div>
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {classes.map((cls) => {
+          {classes.map((cls: HomeClass) => {
             const totalSubjects = cls.students.reduce(
-              (sum, s) => sum + s.subjects.length,
+              (sum: number, s: HomeStudent) => sum + s.subjects.length,
               0
             );
             return (

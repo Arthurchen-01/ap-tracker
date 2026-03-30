@@ -77,13 +77,18 @@ async function computeReviewQuality(prisma: PrismaClient, studentId: string, sub
       updateDate: { gte: sevenDaysAgo },
     },
   })
+  type ReviewUpdate = (typeof updates)[number]
 
   if (updates.length === 0) return 0.1
 
-  const hasTestScore = updates.some(u => u.scorePercent != null)
+  const hasTestScore = updates.some(
+    (u: ReviewUpdate) => u.scorePercent != null
+  )
   if (hasTestScore) return 0.7
 
-  const hasDetailedDesc = updates.some(u => (u.description?.length ?? 0) > 20)
+  const hasDetailedDesc = updates.some(
+    (u: ReviewUpdate) => (u.description?.length ?? 0) > 20
+  )
   if (hasDetailedDesc) return 0.5
 
   return 0.3
@@ -114,9 +119,9 @@ export async function calculateFiveRate(
 
   // 3. Trend (15%) — last 5 scores
   const recent5 = records
-    .filter(r => r.scorePercent != null)
+    .filter((r: AssessmentLike) => r.scorePercent != null)
     .slice(-5)
-    .map(r => r.scorePercent as number)
+    .map((r: AssessmentLike) => r.scorePercent as number)
   const trend = computeTrend(recent5)
 
   // 4. Stability (15%)
