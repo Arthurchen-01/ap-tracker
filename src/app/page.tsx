@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { classroom, getClassroomStats } from "@/lib/mock-data";
+import { prisma } from "@/lib/prisma";
 import {
   Card,
   CardContent,
@@ -8,9 +8,17 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-export default function Home() {
-  const stats = getClassroomStats();
-  const classrooms = [classroom]; // V1 only one class, but structure supports multiple
+export default async function Home() {
+  // Fetch classes from database
+  const classes = await prisma.class.findMany({
+    include: {
+      students: {
+        include: {
+          subjects: true,
+        },
+      },
+    },
+  });
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -25,24 +33,27 @@ export default function Home() {
         </div>
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {classrooms.map((cls) => {
-            const subjectCount = Object.keys(stats.subjectCounts).length;
+          {classes.map((cls) => {
+            const totalSubjects = cls.students.reduce(
+              (sum, s) => sum + s.subjects.length,
+              0
+            );
             return (
               <Link key={cls.id} href={`/${cls.id}/dashboard`}>
                 <Card className="cursor-pointer transition-shadow hover:shadow-lg">
                   <CardHeader>
                     <CardTitle className="text-xl">{cls.name}</CardTitle>
-                    <CardDescription>班级空间</CardDescription>
+                    <CardDescription>{cls.season}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-col gap-2 text-sm text-zinc-600">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">学生人数：</span>
-                        <span>{stats.totalStudents}</span>
+                        <span>{cls.students.length}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">科目总数：</span>
-                        <span>{subjectCount}</span>
+                        <span className="font-medium">报考总科次：</span>
+                        <span>{totalSubjects}</span>
                       </div>
                     </div>
                   </CardContent>
@@ -51,6 +62,12 @@ export default function Home() {
             );
           })}
         </div>
+
+        {classes.length === 0 && (
+          <div className="text-center text-zinc-500 py-12">
+            暂无班级，请先运行 seed 创建数据
+          </div>
+        )}
       </div>
     </div>
   );
