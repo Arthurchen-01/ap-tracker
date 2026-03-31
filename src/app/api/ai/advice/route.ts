@@ -26,14 +26,74 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: '学生不存在' }, { status: 404 })
   }
 
-  // Build subject briefs from snapshots
+  const subjectCodes = student.subjects.map((subject) => subject.subjectCode)
+
+  const [allSnapshots, allRecentRecords, lastUpdate, classInfo] = await Promise.all([
+    prisma.probabilitySnapshot.findMany({
+      where: {
+        studentId: sid,
+        subjectCode: { in: subjectCodes },
+      },
+      orderBy: [{ subjectCode: 'asc' }, { snapshotDate: 'desc' }],
+      select: {
+        subjectCode: true,
+        snapshotDate: true,
+        fiveRate: true,
+        confidenceLevel: true,
+      },
+    }),
+    prisma.assessmentRecord.findMany({
+      where: {
+        studentId: sid,
+        subjectCode: { in: subjectCodes },
+      },
+      orderBy: [{ subjectCode: 'asc' }, { takenAt: 'desc' }],
+      select: {
+        subjectCode: true,
+        takenAt: true,
+      },
+    }),
+    prisma.dailyUpdate.findFirst({
+      where: { studentId: sid },
+      orderBy: { updateDate: 'desc' },
+      select: { updateDate: true },
+    }),
+    prisma.class.findUnique({
+      where: { id: student.classId },
+      include: { examDates: true },
+    }),
+  ])
+
+  const snapshotsBySubject = new Map<string, typeof allSnapshots>()
+  for (const snapshot of allSnapshots) {
+    const snapshots = snapshotsBySubject.get(snapshot.subjectCode) ?? []
+    if (snapshots.length < 5) {
+      snapshots.push(snapshot)
+      snapshotsBySubject.set(snapshot.subjectCode, snapshots)
+    }
+  }
+
+  const recordsBySubject = new Map<string, typeof allRecentRecords>()
+  for (const record of allRecentRecords) {
+    const records = recordsBySubject.get(record.subjectCode) ?? []
+    if (records.length < 10) {
+      records.push(record)
+      recordsBySubject.set(record.subjectCode, records)
+    }
+  }
+
+  const getDaysSince = (date?: Date) => {
+    if (!date) return undefined
+    return Math.max(
+      0,
+      Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24)),
+    )
+  }
+
+  // Build subject briefs from batched snapshots and assessment records
   const subjects: StudentContext['subjects'] = []
   for (const sub of student.subjects) {
-    const snapshots = await prisma.probabilitySnapshot.findMany({
-      where: { studentId: sid, subjectCode: sub.subjectCode },
-      orderBy: { snapshotDate: 'desc' },
-      take: 5,
-    })
+    const snapshots = snapshotsBySubject.get(sub.subjectCode) ?? []
 
     const latestRate =
       snapshots.length > 0 ? Math.round(snapshots[0].fiveRate * 100) : 0
@@ -47,16 +107,13 @@ export async function GET(request: Request) {
     }
 
     // Find weakest units (from assessment records)
-    const recentRecords = await prisma.assessmentRecord.findMany({
-      where: { studentId: sid, subjectCode: sub.subjectCode },
-      orderBy: { takenAt: 'desc' },
-      take: 10,
-    })
+    const recentRecords = recordsBySubject.get(sub.subjectCode) ?? []
+    const daysSinceLastRecord = getDaysSince(recentRecords[0]?.takenAt)
 
     const confidenceLevel =
       snapshots.length > 0
         ? snapshots[0].confidenceLevel
-        : getConfidenceLevel(recentRecords.length)
+        : getConfidenceLevel(recentRecords.length, daysSinceLastRecord)
 
     const weakestUnits: string[] = []
     if (latestRate < 60) {
@@ -72,13 +129,6 @@ export async function GET(request: Request) {
     })
   }
 
-  // Check recent activity
-  const lastUpdate = await prisma.dailyUpdate.findFirst({
-    where: { studentId: sid },
-    orderBy: { updateDate: 'desc' },
-    select: { updateDate: true },
-  })
-
   let recentActivity = 'active'
   if (lastUpdate) {
     const daysSince = Math.floor(
@@ -88,12 +138,6 @@ export async function GET(request: Request) {
   } else {
     recentActivity = 'inactive'
   }
-
-  // Nearest exam
-  const classInfo = await prisma.class.findUnique({
-    where: { id: student.classId },
-    include: { examDates: true },
-  })
 
   let daysUntilNearestExam = 999
   if (classInfo) {

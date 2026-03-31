@@ -102,6 +102,13 @@ function computeDecay(lastActivityDate: Date | null): number {
   return Math.min(days * 0.005, 0.10)
 }
 
+function getDaysSince(date: Date | null | undefined): number | undefined {
+  if (!date) return undefined
+
+  const diffMs = Date.now() - date.getTime()
+  return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
+}
+
 export async function calculateFiveRate(
   prisma: PrismaClient,
   studentId: string,
@@ -150,7 +157,10 @@ export async function calculateFiveRate(
   )
 
   // 8. Confidence
-  const confidenceLevel = getConfidenceLevel(records.length)
+  const confidenceLevel = getConfidenceLevel(
+    records.length,
+    getDaysSince(lastRecord?.takenAt),
+  )
 
   return {
     fiveRate,

@@ -1,8 +1,22 @@
 export type ConfidenceLevel = "high" | "medium" | "low";
 
-export function getConfidenceLevel(recordCount: number): ConfidenceLevel {
-  if (recordCount >= 5) return "high";
-  if (recordCount >= 2) return "medium";
+function normalizeDaysSince(daysSinceLastRecord?: number): number {
+  if (typeof daysSinceLastRecord !== "number" || Number.isNaN(daysSinceLastRecord)) {
+    return 999;
+  }
+
+  return Math.max(0, daysSinceLastRecord);
+}
+
+export function getConfidenceLevel(
+  recordCount: number,
+  daysSinceLastRecord?: number,
+): ConfidenceLevel {
+  const daysSince = normalizeDaysSince(daysSinceLastRecord);
+
+  if (recordCount >= 5 && daysSince <= 30) return "high";
+  if (recordCount >= 2 && daysSince <= 60) return "medium";
+  if (recordCount >= 5) return "medium";
   return "low";
 }
 
