@@ -3,17 +3,21 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["public"]
 }
 
 model Class {
-  id          String         @id @default(cuid())
-  name        String
-  season      String
-  students    Student[]
-  examDates   ExamDate[]
-  createdAt   DateTime       @default(now())
+  id        String      @id @default(cuid())
+  name      String
+  season    String
+  students  Student[]
+  examDates ExamDate[]
+  createdAt DateTime    @default(now())
+
+  @@schema("public")
 }
 
 model Student {
@@ -21,28 +25,39 @@ model Student {
   classId         String
   name            String
   role            String               @default("student")
+  onboardingStep  Int                  @default(1)
+  onboardingDone  Boolean              @default(false)
   class           Class                @relation(fields: [classId], references: [id])
   subjects        StudentSubject[]
   assessments     AssessmentRecord[]
   dailyUpdates    DailyUpdate[]
   snapshots       ProbabilitySnapshot[]
   resources       Resource[]
+  learningMethod LearningMethod?
+  initialMockExams InitialMockExam[]
+  user            User?
+
+  @@schema("public")
 }
 
 model Subject {
-  id            String   @id @default(cuid())
-  code          String   @unique
-  name          String
-  unitCount     Int
-  passingScore  Float
+  id           String @id @default(cuid())
+  code         String @unique
+  name         String
+  unitCount    Int
+  passingScore Float
+
+  @@schema("public")
 }
 
 model StudentSubject {
-  id           String  @id @default(cuid())
-  studentId    String
-  subjectCode  String
-  targetScore  Float   @default(5)
-  student      Student @relation(fields: [studentId], references: [id])
+  id          String  @id @default(cuid())
+  studentId   String
+  subjectCode String
+  targetScore Float   @default(5)
+  student     Student @relation(fields: [studentId], references: [id])
+
+  @@schema("public")
 }
 
 model ExamDate {
@@ -51,10 +66,12 @@ model ExamDate {
   subjectCode String
   examDate    DateTime
   class       Class    @relation(fields: [classId], references: [id])
+
+  @@schema("public")
 }
 
 model AssessmentRecord {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   studentId    String
   subjectCode  String
   recordType   String
@@ -63,25 +80,64 @@ model AssessmentRecord {
   source       String?
   scoreRaw     Float?
   scorePercent Float?
-  takenAt      DateTime
-  student      Student  @relation(fields: [studentId], references: [id])
+  takenAt     DateTime
+  student      Student   @relation(fields: [studentId], references: [id])
+
+  @@schema("public")
 }
 
 model DailyUpdate {
-  id              String   @id @default(cuid())
-  studentId       String
-  updateDate      DateTime
-  subjectCode     String
-  activityType    String
-  timedMode       String?
-  durationMinutes Int?
-  scoreRaw        Float?
-  scorePercent    Float?
-  description     String?
+  id               String    @id @default(cuid())
+  studentId        String
+  updateDate       DateTime
+  subjectCode      String
+  activityType     String
+  timedMode        String?
+  durationMinutes  Int?
+  scoreRaw         Float?
+  scorePercent     Float?
+  description      String?
   aiEvidenceLevel String?
   aiDeltaScore    Float?
   aiExplanation   String?
-  student         Student  @relation(fields: [studentId], references: [id])
+  taskType        String?
+  unitTopic       String?
+  student         Student   @relation(fields: [studentId], references: [id])
+
+  @@schema("public")
+}
+
+model LearningMethod {
+  id            String   @id @default(cuid())
+  studentId     String   @unique
+  methodType    String
+  description   String
+  strengths     String
+  weaknesses    String
+  timePerWeek  Int?
+  mainResources String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  student      Student  @relation(fields: [studentId], references: [id])
+
+  @@schema("public")
+}
+
+model InitialMockExam {
+  id           String    @id @default(cuid())
+  studentId    String
+  subjectCode  String
+  examDate     DateTime
+  source       String?
+  recordType   String
+  timedMode    String
+  difficulty   String
+  scoreRaw     Float?
+  scorePercent Float?
+  createdAt    DateTime  @default(now())
+  student      Student   @relation(fields: [studentId], references: [id])
+
+  @@schema("public")
 }
 
 model ProbabilitySnapshot {
@@ -91,16 +147,18 @@ model ProbabilitySnapshot {
   snapshotDate    DateTime
   fiveRate        Float
   readinessScore  Float?
-  stabilityScore  Float?
+  stabilityScore   Float?
   trendScore      Float?
   decayScore      Float?
   confidenceLevel String
   explanation     String?
   student         Student  @relation(fields: [studentId], references: [id])
+
+  @@schema("public")
 }
 
 model Resource {
-  id           String   @id @default(cuid())
+  id           String  @id @default(cuid())
   uploaderId   String
   subjectCode  String
   title        String
@@ -110,4 +168,17 @@ model Resource {
   url          String?
   createdAt    DateTime @default(now())
   student      Student  @relation(fields: [uploaderId], references: [id])
+
+  @@schema("public")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  studentId    String?  @unique
+  student      Student? @relation(fields: [studentId], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@schema("public")
 }
