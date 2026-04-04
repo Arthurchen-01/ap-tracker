@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { hash } from "crypto";
+import { createHash } from "crypto";
 
 function hashPassword(pwd: string): string {
-  return hash("sha256", pwd, "hex");
+  return createHash("sha256").update(pwd).digest("hex");
 }
 
 export async function POST(req: NextRequest) {
