@@ -12,6 +12,7 @@ const PUBLIC_PATHS = [
   "/api/admin/students",
   "/api/admin/exam-dates",
   "/api/admin/subjects",
+  "/admin/login",
 ];
 
 export function middleware(request: NextRequest) {
@@ -25,6 +26,13 @@ export function middleware(request: NextRequest) {
     pathname.includes(".")
   ) {
     return NextResponse.next();
+  }
+
+  // Admin routes redirect to admin login
+  if (pathname.startsWith("/admin")) {
+    const adminLoginUrl = new URL("/admin/login", request.url);
+    adminLoginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(adminLoginUrl);
   }
 
   // Check for required session cookies
